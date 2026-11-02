@@ -4,6 +4,9 @@ on: [push, workflow_dispatch]
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
     steps:
       - uses: actions/checkout@v4
 
@@ -37,7 +40,13 @@ jobs:
           echo "Building inside directory: $BUILD_DIR"
           cd "$BUILD_DIR"
 
-          # 3. Download and use exact Gradle 8.5
+          # 3. Write SDK path for Gradle
+          echo "sdk.dir=/usr/local/lib/android/sdk" > local.properties
+
+          # 4. Accept licenses
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses 2>/dev/null || true
+
+          # 5. Download and run Gradle 8.5
           if [ ! -d "/tmp/gradle-8.5" ]; then
             echo "Downloading Gradle 8.5..."
             curl -sLo /tmp/gradle.zip https://services.gradle.org/distributions/gradle-8.5-bin.zip
