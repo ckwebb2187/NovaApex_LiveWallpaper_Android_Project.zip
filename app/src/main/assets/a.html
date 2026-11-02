@@ -60,8 +60,8 @@ body{background:#060913;color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFo
 .tab.act{display:block;}
 .sec-label{font-size:10px;font-weight:700;letter-spacing:1.2px;color:#64748b;margin:16px 0 8px;text-transform:uppercase;}
 .note{font-size:11px;color:#64748b;line-height:1.5;margin-top:8px;}
-.swatch-row{display:flex;gap:10px;}
-.swatch{width:38px;height:38px;border-radius:50%;border:2px solid transparent;cursor:pointer;}
+.swatch-row{display:flex;gap:9px;flex-wrap:wrap;}
+.swatch{width:36px;height:36px;border-radius:50%;border:2px solid transparent;cursor:pointer;}
 .swatch.act{border-color:#fff;box-shadow:0 0 12px rgba(255,255,255,0.4);}
 .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
 .grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
@@ -346,7 +346,17 @@ const THEMES = {
   ember:   { p: '#fb923c', a: '#ef4444' },
   emerald: { p: '#34d399', a: '#0ea5e9' },
   rose:    { p: '#f472b6', a: '#f59e0b' },
-  ice:     { p: '#e0f2fe', a: '#38bdf8' }
+  ice:     { p: '#e0f2fe', a: '#38bdf8' },
+  matrix:  { p: '#22c55e', a: '#a3e635' },
+  gold:    { p: '#facc15', a: '#f97316' },
+  crimson: { p: '#f43f5e', a: '#7c3aed' },
+  aqua:    { p: '#2dd4bf', a: '#3b82f6' },
+  sunset:  { p: '#fb7185', a: '#fbbf24' },
+  galaxy:  { p: '#c084fc', a: '#22d3ee' },
+  toxic:   { p: '#bef264', a: '#10b981' },
+  synth:   { p: '#f0abfc', a: '#22d3ee' },
+  chrome:  { p: '#e5e7eb', a: '#64748b' },
+  plasma:  { p: '#60a5fa', a: '#f472b6' }
 };
 const STATES = {
   idle:      { label: 'IDLE',      rate: 0.6, dot: '#10b981' },
@@ -355,15 +365,48 @@ const STATES = {
   speaking:  { label: 'SPEAKING',  rate: 1.3, dot: '#a78bfa' }
 };
 const STATE_KEYS = Object.keys(STATES);
-const LAYERS = { sphere: 'Neural sphere', orbits: 'Atom orbits', rings: 'HUD rings', warp: 'Warp stars', grid: 'Holo grid', wave: 'Voice wave', scan: 'Scanlines' };
-const SCENES = {
-  neural:   { label: 'Neural Atom', layers: { sphere: 1, orbits: 0, rings: 0, warp: 0, grid: 0, wave: 0, scan: 0 } },
-  quantum:  { label: 'Quantum',     layers: { sphere: 0, orbits: 1, rings: 0, warp: 0, grid: 0, wave: 1, scan: 0 } },
-  reactor:  { label: 'Arc Reactor', layers: { sphere: 0, orbits: 0, rings: 1, warp: 0, grid: 0, wave: 1, scan: 0 } },
-  hyper:    { label: 'Hyperdrive',  layers: { sphere: 1, orbits: 0, rings: 0, warp: 1, grid: 0, wave: 0, scan: 0 } },
-  holo:     { label: 'Holo Deck',   layers: { sphere: 0, orbits: 1, rings: 1, warp: 0, grid: 1, wave: 0, scan: 1 } },
-  singular: { label: 'Singularity', layers: { sphere: 1, orbits: 1, rings: 1, warp: 1, grid: 0, wave: 1, scan: 1 } }
+const LAYERS = {
+  sphere: 'Neural sphere', orbits: 'Atom orbits', rings: 'HUD rings', warp: 'Warp stars', grid: 'Holo grid',
+  wave: 'Voice wave', scan: 'Scanlines', helix: 'DNA helix', hex: 'Hex shield', radar: 'Radar sweep',
+  rain: 'Data rain', nebula: 'Nebula clouds', tendrils: 'Plasma tendrils', galaxy: 'Spiral galaxy',
+  tunnel: 'Wormhole', beat: 'Heartbeat rings', spectrum: 'Spectrum bars'
 };
+// Each scene lists the layers it turns on; everything else is off
+const SCENE_LIST = [
+  ['neural', 'Neural Atom', 'sphere'],
+  ['quantum', 'Quantum', 'orbits wave'],
+  ['reactor', 'Arc Reactor', 'rings wave'],
+  ['hyper', 'Hyperdrive', 'sphere warp'],
+  ['holo', 'Holo Deck', 'orbits rings grid scan'],
+  ['singular', 'Singularity', 'sphere orbits rings warp wave scan'],
+  ['helix', 'Double Helix', 'helix'],
+  ['hexshield', 'Hex Shield', 'hex rings'],
+  ['radar', 'Radar Sweep', 'radar scan'],
+  ['datarain', 'Data Rain', 'rain sphere'],
+  ['nebula', 'Nebula Drift', 'nebula'],
+  ['plasma', 'Plasma Storm', 'tendrils wave'],
+  ['galaxy', 'Spiral Galaxy', 'galaxy nebula'],
+  ['wormhole', 'Wormhole', 'tunnel warp'],
+  ['heartbeat', 'Heartbeat', 'beat wave'],
+  ['equalizer', 'Equalizer', 'spectrum rings'],
+  ['cybergrid', 'Cyber Grid', 'grid rain scan'],
+  ['biolab', 'Bio Lab', 'helix orbits'],
+  ['bridge', 'Starship Bridge', 'radar rings scan'],
+  ['blackhole', 'Black Hole', 'galaxy tunnel'],
+  ['storm', 'Neural Storm', 'sphere tendrils'],
+  ['deepspace', 'Deep Space', 'nebula warp'],
+  ['holoradar', 'Holo Radar', 'radar grid'],
+  ['pulsecore', 'Pulse Core', 'beat spectrum'],
+  ['fortress', 'Fortress', 'hex orbits scan'],
+  ['overdrive', 'Overdrive', 'tunnel spectrum tendrils rain']
+];
+const SCENES = {};
+SCENE_LIST.forEach(([key, label, on]) => {
+  const layers = {};
+  Object.keys(LAYERS).forEach(l => layers[l] = 0);
+  on.split(' ').forEach(l => layers[l] = 1);
+  SCENES[key] = { label: label, layers: layers };
+});
 const SCENE_KEYS = Object.keys(SCENES);
 const QUALITY = {
   battery:  { fps: 30,  dpr: 1,    nodes: 60,  warp: 70 },
@@ -750,6 +793,249 @@ function drawEmp(t, cx, cy, k) {
   if (empWave >= 1) empWave = 0;
 }
 
+// ===== Extra layers =====
+let galaxyPts = [], hexCells = [], rainCols = [], blips = [], specBars = [], nebulaBlobs = [];
+let blobSprites = null;
+
+function buildExtras() {
+  // spiral galaxy: points along two arms
+  galaxyPts = [];
+  const gn = Q().nodes * 3;
+  for (let i = 0; i < gn; i++) {
+    const arm = i % 2, r = Math.pow(Math.random(), 0.7);
+    galaxyPts.push({ r: r, a: r * 5 + arm * Math.PI + (Math.random() - 0.5) * 0.6, g: i % 3 });
+  }
+  // hex shield: cells of a hex grid inside a circle
+  hexCells = [];
+  for (let q = -4; q <= 4; q++) {
+    for (let r = -4; r <= 4; r++) {
+      const x = 1.5 * q, y = Math.sqrt(3) * (r + q / 2);
+      const d = Math.sqrt(x * x + y * y);
+      if (d <= 6.2 && d > 1.2) hexCells.push({ x: x, y: y, d: d });
+    }
+  }
+  // data rain columns
+  rainCols = [];
+  const cols = Math.max(8, Math.round(W / 16));
+  for (let i = 0; i < cols; i++) rainCols.push({ x: (i + 0.5) * W / cols, y: Math.random() * H, v: 2 + Math.random() * 4, len: 40 + Math.random() * 120 });
+  // radar contacts
+  blips = [];
+  for (let i = 0; i < 9; i++) blips.push({ a: Math.random() * Math.PI * 2, r: 0.25 + Math.random() * 0.7 });
+  specBars = new Array(48).fill(0);
+  nebulaBlobs = [];
+  for (let i = 0; i < 6; i++) nebulaBlobs.push({ a: i / 6 * Math.PI * 2, d: 0.3 + Math.random() * 0.5, s: 1 + Math.random() * 0.8, sp: (Math.random() - 0.5) * 0.4, c: i % 2 });
+  blobSprites = null;
+}
+
+function blobSprite(color) {
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const x = c.getContext('2d');
+  const g = x.createRadialGradient(64, 64, 0, 64, 64, 64);
+  g.addColorStop(0, color + 'aa');
+  g.addColorStop(0.5, color + '33');
+  g.addColorStop(1, 'rgba(0,0,0,0)');
+  x.fillStyle = g;
+  x.fillRect(0, 0, 128, 128);
+  return c;
+}
+
+function drawNebula(t, cx, cy, R) {
+  if (!blobSprites || blobSprites.theme !== cfg.theme) blobSprites = { theme: cfg.theme, list: [blobSprite(t.p), blobSprite(t.a)] };
+  ctx.globalAlpha = 0.32;
+  for (const b of nebulaBlobs) {
+    const a = b.a + phase * b.sp * 0.3;
+    const size = R * 2.2 * b.s * (1 + Math.sin(phase * 0.5 + b.a) * 0.08);
+    const x = cx + Math.cos(a) * R * b.d * 1.4, y = cy + Math.sin(a) * R * b.d * 1.8;
+    ctx.drawImage(blobSprites.list[b.c], x - size / 2, y - size / 2, size, size);
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawGalaxy(t, cx, cy, R) {
+  const rot = phase * 0.25;
+  const groups = [[], [], []];
+  for (const p of galaxyPts) groups[p.g].push(p);
+  ctx.fillStyle = t.p;
+  for (let g = 0; g < 3; g++) {
+    ctx.globalAlpha = [0.5, 0.75, 1][g];
+    ctx.fillStyle = g === 2 ? t.a : t.p;
+    ctx.beginPath();
+    for (const p of groups[g]) {
+      const a = p.a + rot, rr = p.r * R * 1.5;
+      const x = cx + Math.cos(a) * rr, y = cy + Math.sin(a) * rr * 0.45;
+      const sz = 1.6 + (1 - p.r) * 2.2;
+      ctx.rect(x - sz / 2, y - sz / 2, sz, sz);
+    }
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawTunnel(t, cx, cy, R) {
+  const far = Math.max(W, H) * 0.75;
+  ctx.lineWidth = 1.4;
+  for (let i = 0; i < 9; i++) {
+    const z = ((i / 9) + phase * 0.12) % 1;
+    const r = R * 0.12 + z * z * far;
+    ctx.globalAlpha = Math.min(0.7, z * (1 - z) * 3);
+    ctx.strokeStyle = i % 2 ? t.a : t.p;
+    ctx.beginPath();
+    const rot = phase * 0.2 + z * 1.5;
+    for (let j = 0; j <= 6; j++) {
+      const a = rot + j / 6 * Math.PI * 2;
+      if (j) ctx.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r);
+      else ctx.moveTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r);
+    }
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawRain(t, k) {
+  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = t.p;
+  ctx.globalAlpha = 0.35;
+  ctx.beginPath();
+  for (const c of rainCols) {
+    c.y += c.v * k * 1.6;
+    if (c.y - c.len > H) { c.y = -Math.random() * 200; c.v = 2 + Math.random() * 4; }
+    ctx.moveTo(c.x, c.y - c.len); ctx.lineTo(c.x, c.y);
+  }
+  ctx.stroke();
+  ctx.globalAlpha = 0.95;
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  for (const c of rainCols) ctx.rect(c.x - 1.5, c.y - 3, 3, 4);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+}
+
+function drawHex(t, cx, cy, R) {
+  const size = R * 0.16;
+  const lit = [], dim = [];
+  for (const h of hexCells) (Math.sin(h.d * 1.4 - phase * 3) > 0.55 ? lit : dim).push(h);
+  ctx.lineWidth = 1.2;
+  [[dim, t.a, 0.18], [lit, t.p, 0.85]].forEach(([list, col, al]) => {
+    ctx.strokeStyle = col; ctx.globalAlpha = al;
+    ctx.beginPath();
+    for (const h of list) {
+      const x = cx + h.x * size, y = cy + h.y * size;
+      for (let j = 0; j <= 6; j++) {
+        const a = j / 6 * Math.PI * 2;
+        const px = x + Math.cos(a) * size * 0.92, py = y + Math.sin(a) * size * 0.92;
+        if (j) ctx.lineTo(px, py); else ctx.moveTo(px, py);
+      }
+    }
+    ctx.stroke();
+  });
+  ctx.globalAlpha = 1;
+}
+
+function drawRadar(t, cx, cy, R) {
+  const r = R * 1.15;
+  ctx.strokeStyle = t.p; ctx.lineWidth = 1; ctx.globalAlpha = 0.3;
+  ctx.beginPath();
+  for (let i = 1; i <= 4; i++) { ctx.moveTo(cx + r * i / 4, cy); ctx.arc(cx, cy, r * i / 4, 0, Math.PI * 2); }
+  ctx.moveTo(cx - r, cy); ctx.lineTo(cx + r, cy);
+  ctx.moveTo(cx, cy - r); ctx.lineTo(cx, cy + r);
+  ctx.stroke();
+  const sweep = (phase * 1.2) % (Math.PI * 2);
+  ctx.fillStyle = t.p; ctx.globalAlpha = 0.14;
+  ctx.beginPath(); ctx.moveTo(cx, cy); ctx.arc(cx, cy, r, sweep - 0.7, sweep); ctx.closePath(); ctx.fill();
+  ctx.globalAlpha = 0.9; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(sweep) * r, cy + Math.sin(sweep) * r); ctx.stroke();
+  // contacts glow when the sweep passes, then fade
+  ctx.fillStyle = t.a;
+  for (const b of blips) {
+    const behind = (sweep - b.a + Math.PI * 4) % (Math.PI * 2);
+    const glow = Math.max(0, 1 - behind / 2.5);
+    if (glow <= 0) continue;
+    ctx.globalAlpha = glow;
+    ctx.beginPath(); ctx.arc(cx + Math.cos(b.a) * r * b.r, cy + Math.sin(b.a) * r * b.r, 3 + glow * 2, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawHelix(t, cx, cy, R) {
+  const h = Math.min(H * 0.7, R * 3.4), n = 34, top = cy - h / 2;
+  const a1 = [], a2 = [];
+  for (let i = 0; i <= n; i++) {
+    const y = top + i / n * h, ang = i * 0.45 + phase * 1.5;
+    a1.push({ x: cx + Math.sin(ang) * R * 0.45, y: y, z: Math.cos(ang) });
+    a2.push({ x: cx + Math.sin(ang + Math.PI) * R * 0.45, y: y, z: -Math.cos(ang) });
+  }
+  ctx.strokeStyle = t.a; ctx.globalAlpha = 0.3; ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let i = 0; i <= n; i += 2) { ctx.moveTo(a1[i].x, a1[i].y); ctx.lineTo(a2[i].x, a2[i].y); }
+  ctx.stroke();
+  ctx.lineWidth = 2;
+  [[a1, t.p], [a2, t.a]].forEach(([pts, col]) => {
+    ctx.strokeStyle = col; ctx.globalAlpha = 0.75;
+    ctx.beginPath();
+    pts.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y));
+    ctx.stroke();
+  });
+  ctx.fillStyle = '#ffffff'; ctx.globalAlpha = 0.85;
+  ctx.beginPath();
+  for (const p of a1.concat(a2)) {
+    if (p.z < 0.3) continue;
+    const r = 1.5 + p.z * 1.8;
+    ctx.moveTo(p.x + r, p.y); ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+  }
+  ctx.fill();
+  ctx.globalAlpha = 1;
+}
+
+function drawTendrils(t, cx, cy, R) {
+  const n = 7, reach = R * (1.05 + level * 0.5);
+  [[t.p, 2.2, 0.55], ['#ffffff', 0.8, 0.5]].forEach(([col, lw, al]) => {
+    ctx.strokeStyle = col; ctx.lineWidth = lw; ctx.globalAlpha = al;
+    ctx.beginPath();
+    for (let i = 0; i < n; i++) {
+      const a = i / n * Math.PI * 2 + phase * 0.3 + Math.sin(phase * 0.7 + i) * 0.3;
+      const len = reach * (0.75 + Math.sin(phase * 2 + i * 1.7) * 0.25);
+      const ex = cx + Math.cos(a) * len, ey = cy + Math.sin(a) * len;
+      const bend = Math.sin(phase * 3 + i * 2.1) * R * 0.45;
+      const mx = cx + Math.cos(a) * len * 0.5 - Math.sin(a) * bend, my = cy + Math.sin(a) * len * 0.5 + Math.cos(a) * bend;
+      ctx.moveTo(cx, cy); ctx.quadraticCurveTo(mx, my, ex, ey);
+    }
+    ctx.stroke();
+  });
+  ctx.globalAlpha = 1;
+}
+
+function drawBeat(t, cx, cy, R) {
+  ctx.lineWidth = 2;
+  for (let i = 0; i < 4; i++) {
+    const z = (phase * 0.45 + i / 4) % 1;
+    ctx.strokeStyle = i % 2 ? t.a : t.p;
+    ctx.globalAlpha = (1 - z) * 0.7;
+    ctx.beginPath(); ctx.arc(cx, cy, R * 0.3 + z * R * 1.4, 0, Math.PI * 2); ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawSpectrum(t, cx, cy, R) {
+  const n = specBars.length, base = R * 0.62;
+  for (let i = 0; i < n; i++) {
+    const want = 0.15 + level * Math.random() * 0.9 + Math.max(0, Math.sin(phase * 4 + i * 0.5)) * 0.25;
+    specBars[i] += (want - specBars[i]) * 0.3;
+  }
+  ctx.lineWidth = Math.max(2, base * 2 * Math.PI / n * 0.45);
+  [[0, t.p], [1, t.a]].forEach(([odd, col]) => {
+    ctx.strokeStyle = col; ctx.globalAlpha = 0.8;
+    ctx.beginPath();
+    for (let i = odd; i < n; i += 2) {
+      const a = i / n * Math.PI * 2 - Math.PI / 2, len = R * 0.45 * specBars[i];
+      const c = Math.cos(a), sn = Math.sin(a);
+      ctx.moveTo(cx + c * base, cy + sn * base); ctx.lineTo(cx + c * (base + len), cy + sn * (base + len));
+    }
+    ctx.stroke();
+  });
+  ctx.globalAlpha = 1;
+}
+
 function render(dt) {
   const t = th();
   const st = curState();
@@ -767,12 +1053,22 @@ function render(dt) {
   const cx = W / 2, cy = H / 2;
   const R = Math.min(W, H) * 0.32 * cfg.size;
   const L = cfg.layers;
+  if (L.nebula) drawNebula(t, cx, cy, R);
+  if (L.galaxy) drawGalaxy(t, cx, cy, R);
+  if (L.tunnel) drawTunnel(t, cx, cy, R);
   if (L.grid) drawGrid(t, k);
+  if (L.rain) drawRain(t, k);
   if (L.warp) drawWarp(t, k, cx, cy);
   drawParticles(t, k);
   if (L.rings) drawRings(t, cx, cy, R);
   if (L.sphere) drawSphere(t, cx, cy, R);
   if (L.orbits) drawOrbits(t, cx, cy, R);
+  if (L.hex) drawHex(t, cx, cy, R);
+  if (L.radar) drawRadar(t, cx, cy, R);
+  if (L.helix) drawHelix(t, cx, cy, R);
+  if (L.beat) drawBeat(t, cx, cy, R);
+  if (L.tendrils) drawTendrils(t, cx, cy, R);
+  if (L.spectrum) drawSpectrum(t, cx, cy, R);
   if (L.wave) drawWave(t, cx, cy, R);
   drawArcs(t, k, cx, cy);
   drawCore(t, cx, cy);
@@ -889,7 +1185,7 @@ function applyClockStyle(name) {
 function set(k, v) {
   cfg[k] = v;
   if (k === 'particles') buildParticles();
-  if (k === 'quality') { renderScale = 1; resize(); buildNodes(); buildStars(); }
+  if (k === 'quality') { renderScale = 1; resize(); buildNodes(); buildStars(); buildExtras(); }
   saveCfg(); updateUI();
 }
 
@@ -1617,15 +1913,16 @@ window.syncConfig = function () {
   const old = cfg;
   cfg = loadCfg();
   if (cfg.particles !== old.particles) buildParticles();
-  if (cfg.quality !== old.quality) { resize(); buildNodes(); buildStars(); }
+  if (cfg.quality !== old.quality) { resize(); buildNodes(); buildStars(); buildExtras(); }
   updateUI();
 };
 
-window.addEventListener('resize', () => { resize(); buildParticles(); });
+window.addEventListener('resize', () => { resize(); buildParticles(); buildExtras(); });
 resize();
 buildNodes();
 buildParticles();
 buildStars();
+buildExtras();
 if (!isWall) buildUI();
 updateUI();
 if (!isAgent) {
