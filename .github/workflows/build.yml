@@ -13,16 +13,24 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Build APK
+      - name: Install Gradle 8.5
+        run: |
+          wget -q https://services.gradle.org/distributions/gradle-8.5-bin.zip
+          sudo unzip -q -d /opt/gradle gradle-8.5-bin.zip
+          echo "/opt/gradle/gradle-8.5/bin" >> $GITHUB_PATH
+
+      - name: Build APK with Gradle 8.5
         run: |
           for f in *.zip; do
             [ -f "$f" ] && unzip -o "$f"
           done
           
           PROJECT_DIR=$(find . -name "settings.gradle" -exec dirname {} \; | head -n 1)
-          [ -n "$PROJECT_DIR" ] && cd "$PROJECT_DIR"
+          if [ -n "$PROJECT_DIR" ]; then
+            cd "$PROJECT_DIR"
+          fi
           
-          gradle assembleDebug --no-daemon --stacktrace
+          gradle assembleDebug --no-daemon
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
