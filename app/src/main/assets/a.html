@@ -36,11 +36,32 @@ body{background:#060913;color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFo
 .slider-row input{flex:1;accent-color:var(--p);}
 .apply-btn{margin-top:20px;width:100%;padding:14px;border:0;border-radius:14px;font-size:14px;font-weight:800;letter-spacing:0.8px;color:#060913;background:var(--p);box-shadow:0 6px 20px rgba(0,0,0,0.5);cursor:pointer;}
 
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
+.grid-3+.grid-3,.grid-2+.grid-3{margin-top:8px;}
+.color-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+.cswatch{width:30px;height:30px;border-radius:50%;border:2px solid transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#060913;}
+.cswatch.act{border-color:#fff;box-shadow:0 0 10px rgba(255,255,255,0.4);}
+#clockColor{width:34px;height:34px;border:0;background:none;padding:0;}
+#clock{position:fixed;left:0;right:0;z-index:5;text-align:center;pointer-events:none;color:var(--c);transition:top .3s,bottom .3s;}
+#clock.pos-top{top:13%;}
+#clock.pos-middle{top:50%;transform:translateY(-50%);}
+#clock.pos-bottom{bottom:17%;}
+#clockTime{font-size:calc(64px * var(--cs));line-height:1;font-variant-numeric:tabular-nums;}
+#clockTime small{font-size:0.38em;margin-left:0.25em;opacity:0.8;}
+#clockDate{margin-top:8px;font-size:calc(15px * var(--cs));letter-spacing:2px;text-transform:uppercase;opacity:0.85;}
+#clock.glow{text-shadow:0 0 18px var(--c),0 0 40px var(--c);}
+#clock.f-thin{font-weight:200;}
+#clock.f-sans{font-weight:500;}
+#clock.f-heavy{font-weight:900;letter-spacing:-1px;}
+#clock.f-mono{font-family:"Courier New",ui-monospace,monospace;font-weight:700;}
+#clock.f-serif{font-family:Georgia,"Times New Roman",serif;font-weight:400;font-style:italic;}
 body.wallpaper .hud-top,body.wallpaper .quick-dock,body.wallpaper .drawer,body.wallpaper #drawerToggle{display:none;}
 </style>
 </head>
 <body>
 <canvas id="bgCanvas"></canvas>
+
+<div id="clock"><div id="clockTime"></div><div id="clockDate"></div></div>
 
 <div class="hud-top">
   <div class="pill" id="statePill"><span class="dot" id="stateDot"></span><span id="stateLabel">IDLE</span></div>
@@ -67,6 +88,47 @@ body.wallpaper .hud-top,body.wallpaper .quick-dock,body.wallpaper .drawer,body.w
 
   <div class="sec-label">State</div>
   <div class="grid-2" id="stateBtns"></div>
+
+  <div class="sec-label">Clock</div>
+  <div class="grid-2">
+    <button class="opt-btn" data-clk="on" data-val="true">Clock on</button>
+    <button class="opt-btn" data-clk="on" data-val="false">Clock off</button>
+  </div>
+
+  <div class="sec-label">Clock style</div>
+  <div class="grid-3" id="clockStyles"></div>
+
+  <div class="sec-label">Clock position</div>
+  <div class="grid-3">
+    <button class="opt-btn" data-clk="pos" data-val="top">Top</button>
+    <button class="opt-btn" data-clk="pos" data-val="middle">Middle</button>
+    <button class="opt-btn" data-clk="pos" data-val="bottom">Bottom</button>
+  </div>
+
+  <div class="sec-label">Clock format</div>
+  <div class="grid-2">
+    <button class="opt-btn" data-clk="h24" data-val="false">12-hour</button>
+    <button class="opt-btn" data-clk="h24" data-val="true">24-hour</button>
+  </div>
+  <div class="grid-3">
+    <button class="opt-btn" data-clk-toggle="secs">Seconds</button>
+    <button class="opt-btn" data-clk-toggle="date">Date</button>
+    <button class="opt-btn" data-clk-toggle="glow">Glow</button>
+  </div>
+
+  <div class="sec-label">Clock font</div>
+  <div class="grid-3">
+    <button class="opt-btn" data-clk="font" data-val="thin">Thin</button>
+    <button class="opt-btn" data-clk="font" data-val="sans">Sans</button>
+    <button class="opt-btn" data-clk="font" data-val="heavy">Heavy</button>
+    <button class="opt-btn" data-clk="font" data-val="mono">Mono</button>
+    <button class="opt-btn" data-clk="font" data-val="serif">Serif</button>
+  </div>
+
+  <div class="sec-label">Clock color</div>
+  <div class="color-row" id="clockColors"><input type="color" id="clockColor"></div>
+
+  <div class="slider-row" style="margin-top:12px"><span>Clock size</span><input type="range" id="rngClockSize" min="0.5" max="2" step="0.05"><b id="valClockSize"></b></div>
 
   <div class="sec-label">Tuning</div>
   <div class="slider-row"><span>Speed</span><input type="range" id="rngSpeed" min="0.2" max="3" step="0.1"><b id="valSpeed"></b></div>
@@ -96,13 +158,27 @@ const STATE_KEYS = Object.keys(STATES);
 const DEFAULTS = { theme: 'cyan', ai: 'gemini', state: 'idle', speed: 1, particles: 120, arcs: 0.35, size: 1 };
 const KEY = 'novaApexCfg';
 
+// Clock presets. Picking one sets these fields; any single change after that makes it "custom".
+const CLOCK_STYLES = {
+  minimal: { label: 'Minimal', font: 'thin',  glow: false, size: 1,    secs: false, date: true },
+  neon:    { label: 'Neon',    font: 'sans',  glow: true,  size: 1,    secs: false, date: true },
+  digital: { label: 'Digital', font: 'mono',  glow: true,  size: 0.9,  secs: true,  date: false },
+  bold:    { label: 'Bold',    font: 'heavy', glow: false, size: 1.3,  secs: false, date: true },
+  classic: { label: 'Classic', font: 'serif', glow: false, size: 1.1,  secs: false, date: true }
+};
+const CLOCK_DEFAULTS = { on: true, style: 'neon', pos: 'top', h24: false, secs: false, date: true, glow: true, font: 'sans', size: 1, color: 'theme' };
+const CLOCK_COLORS = ['theme', '#ffffff', '#38bdf8', '#a78bfa', '#f472b6', '#fb923c', '#facc15', '#34d399'];
+
 const mode = new URLSearchParams(location.search).get('mode') || 'studio';
 if (mode === 'wallpaper') document.body.classList.add('wallpaper');
 
 // Settings are shared between the studio and the wallpaper through localStorage
 function loadCfg() {
-  try { return Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem(KEY) || '{}')); }
-  catch (e) { return Object.assign({}, DEFAULTS); }
+  let c;
+  try { c = Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem(KEY) || '{}')); }
+  catch (e) { c = Object.assign({}, DEFAULTS); }
+  c.clock = Object.assign({}, CLOCK_DEFAULTS, c.clock || {});
+  return c;
 }
 function saveCfg() {
   try { localStorage.setItem(KEY, JSON.stringify(cfg)); } catch (e) {}
@@ -268,6 +344,100 @@ window.addEventListener('pointermove', e => {
 window.addEventListener('pointerup', () => { if (drag && !drag.moved) pulse(); drag = null; });
 
 // ---- Studio UI ----
+// ---- Clock ----
+function clockColor() { return cfg.clock.color === 'theme' ? th().p : cfg.clock.color; }
+
+function tickClock() {
+  const k = cfg.clock;
+  const el = $('clock');
+  el.style.display = k.on ? '' : 'none';
+  if (!k.on) return;
+  const d = new Date();
+  let h = d.getHours();
+  let ampm = '';
+  if (!k.h24) { ampm = h < 12 ? 'AM' : 'PM'; h = h % 12 || 12; }
+  const pad = n => String(n).padStart(2, '0');
+  let t = (k.h24 ? pad(h) : h) + ':' + pad(d.getMinutes());
+  if (k.secs) t += ':' + pad(d.getSeconds());
+  $('clockTime').innerHTML = t + (ampm ? '<small>' + ampm + '</small>' : '');
+  $('clockDate').style.display = k.date ? '' : 'none';
+  if (k.date) $('clockDate').textContent = d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+}
+
+function styleClock() {
+  const k = cfg.clock;
+  const el = $('clock');
+  el.className = 'pos-' + k.pos + ' f-' + k.font + (k.glow ? ' glow' : '');
+  el.style.setProperty('--c', clockColor());
+  el.style.setProperty('--cs', k.size);
+  tickClock();
+}
+
+function setClock(k, v) {
+  cfg.clock[k] = v;
+  // Changing a look setting by hand turns the preset into a custom style
+  if (['font', 'glow', 'size', 'secs', 'date'].includes(k)) cfg.clock.style = 'custom';
+  saveCfg();
+  updateUI();
+}
+
+function applyClockStyle(name) {
+  const p = CLOCK_STYLES[name];
+  Object.keys(p).forEach(key => { if (key !== 'label') cfg.clock[key] = p[key]; });
+  cfg.clock.style = name;
+  saveCfg();
+  updateUI();
+}
+
+function buildClockUI() {
+  const box = $('clockStyles');
+  Object.keys(CLOCK_STYLES).concat('custom').forEach(k => {
+    const b = document.createElement('button');
+    b.className = 'opt-btn';
+    b.dataset.clkStyle = k;
+    b.textContent = k === 'custom' ? 'Custom' : CLOCK_STYLES[k].label;
+    if (k !== 'custom') b.onclick = () => applyClockStyle(k);
+    else b.style.opacity = '0.6';
+    box.appendChild(b);
+  });
+
+  const row = $('clockColors');
+  const picker = $('clockColor');
+  CLOCK_COLORS.forEach(c => {
+    const s = document.createElement('div');
+    s.className = 'cswatch';
+    s.dataset.color = c;
+    if (c === 'theme') { s.textContent = 'T'; s.style.background = 'var(--p)'; }
+    else s.style.background = c;
+    s.onclick = () => setClock('color', c);
+    row.insertBefore(s, picker);
+  });
+  picker.oninput = e => setClock('color', e.target.value);
+
+  document.querySelectorAll('[data-clk]').forEach(b => {
+    b.onclick = () => {
+      let v = b.dataset.val;
+      if (v === 'true') v = true; else if (v === 'false') v = false;
+      setClock(b.dataset.clk, v);
+    };
+  });
+  document.querySelectorAll('[data-clk-toggle]').forEach(b => {
+    b.onclick = () => setClock(b.dataset.clkToggle, !cfg.clock[b.dataset.clkToggle]);
+  });
+  $('rngClockSize').oninput = e => setClock('size', parseFloat(e.target.value));
+}
+
+function updateClockUI() {
+  const k = cfg.clock;
+  document.querySelectorAll('[data-clk]').forEach(b => b.classList.toggle('act', String(k[b.dataset.clk]) === b.dataset.val));
+  document.querySelectorAll('[data-clk-toggle]').forEach(b => b.classList.toggle('act', !!k[b.dataset.clkToggle]));
+  document.querySelectorAll('[data-clk-style]').forEach(b => b.classList.toggle('act', b.dataset.clkStyle === k.style));
+  document.querySelectorAll('.cswatch').forEach(s => s.classList.toggle('act', s.dataset.color === k.color));
+  if (k.color !== 'theme') $('clockColor').value = k.color;
+  $('rngClockSize').value = k.size;
+  $('valClockSize').textContent = k.size + 'x';
+}
+
 function updateUI() {
   const t = th();
   document.documentElement.style.setProperty('--p', t.p);
@@ -277,6 +447,8 @@ function updateUI() {
   $('stateDot').style.boxShadow = '0 0 8px ' + st.dot;
   $('aiIcon').textContent = cfg.ai === 'claude' ? '✳' : '✦';
   $('aiLabel').textContent = cfg.ai === 'claude' ? 'CLAUDE' : 'GEMINI';
+  styleClock();
+  updateClockUI();
   document.querySelectorAll('.swatch').forEach(s => s.classList.toggle('act', s.dataset.theme === cfg.theme));
   document.querySelectorAll('[data-ai]').forEach(b => b.classList.toggle('act', b.dataset.ai === cfg.ai));
   document.querySelectorAll('[data-state]').forEach(b => b.classList.toggle('act', b.dataset.state === cfg.state));
@@ -349,7 +521,9 @@ resize();
 buildNodes();
 buildParticles();
 buildUI();
+buildClockUI();
 updateUI();
+setInterval(tickClock, 1000);
 render();
 </script>
 </body>
