@@ -16,10 +16,9 @@ jobs:
       - name: Build APK
         run: |
           mkdir -p app/src/main/java/com/nova/apex/wallpaper app/src/main/res/xml app/src/main/assets
-          echo "rootProject.name='NovaApex';include ':app'" > settings.gradle
-          echo "pluginManagement{repositories{google();mavenCentral()}};dependencyResolutionManagement{repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS);repositories{google();mavenCentral()}}" >> settings.gradle
-          echo "plugins{id 'com.android.application' version '8.2.2' apply false}" > build.gradle
-          echo "plugins{id 'com.android.application'};android{namespace 'com.nova.apex.wallpaper';compileSdk 34;defaultConfig{applicationId 'com.nova.apex.wallpaper';minSdk 24;targetSdk 34;versionCode 1;versionName '1.0'}}" > app/build.gradle
+          printf "pluginManagement {\n  repositories {\n    google()\n    mavenCentral()\n    gradlePluginPortal()\n  }\n}\ndependencyResolutionManagement {\n  repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)\n  repositories {\n    google()\n    mavenCentral()\n  }\n}\nrootProject.name = 'NovaApex'\ninclude ':app'\n" > settings.gradle
+          printf "plugins {\n  id 'com.android.application' version '8.2.2' apply false\n}\n" > build.gradle
+          printf "plugins {\n  id 'com.android.application'\n}\nandroid {\n  namespace 'com.nova.apex.wallpaper'\n  compileSdk 34\n  defaultConfig {\n    applicationId 'com.nova.apex.wallpaper'\n    minSdk 24\n    targetSdk 34\n    versionCode 1\n    versionName '1.0'\n  }\n}\n" > app/build.gradle
           echo '<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.nova.apex.wallpaper"><uses-feature android:name="android.software.live_wallpaper"/><application android:label="Nova Apex"><service android:name=".S" android:exported="true" android:permission="android.permission.BIND_WALLPAPER"><intent-filter><action android:name="android.service.wallpaper.WallpaperService"/></intent-filter><meta-data android:name="android.service.wallpaper" android:resource="@xml/w"/></service></application></manifest>' > app/src/main/AndroidManifest.xml
           echo '<wallpaper xmlns:android="http://schemas.android.com/apk/res/android"/>' > app/src/main/res/xml/w.xml
           echo 'package com.nova.apex.wallpaper;import android.graphics.Canvas;import android.os.*;import android.service.wallpaper.WallpaperService;import android.view.*;import android.webkit.WebView;public class S extends WallpaperService{public Engine onCreateEngine(){return new Engine(){WebView v;Handler h=new Handler(Looper.getMainLooper());boolean vis;public void onCreate(SurfaceHolder sh){super.onCreate(sh);setTouchEventsEnabled(true);h.post(()->{v=new WebView(S.this);v.getSettings().setJavaScriptEnabled(true);v.loadUrl("file:///android_asset/a.html");v.layout(0,0,1080,2400);});}public void onSurfaceChanged(SurfaceHolder sh,int f,int w,int ht){h.post(()->{if(v!=null)v.layout(0,0,w,ht);});}public void onVisibilityChanged(boolean b){vis=b;h.post(()->{if(v!=null){if(vis){v.onResume();l();}else v.onPause();}});}void l(){if(!vis)return;SurfaceHolder sh=getSurfaceHolder();Canvas c=null;try{c=sh.lockCanvas();if(c!=null&&v!=null)v.draw(c);}finally{if(c!=null)sh.unlockCanvasAndPost(c);}h.postDelayed(this::l,16);}public void onTouchEvent(MotionEvent e){h.post(()->{if(v!=null)v.dispatchTouchEvent(e);});}public void onDestroy(){super.onDestroy();h.post(()->{if(v!=null){v.destroy();v=null;}});}};}}' > app/src/main/java/com/nova/apex/wallpaper/S.java
@@ -35,3 +34,4 @@ jobs:
         with:
           name: NovaApex-LiveWallpaper-APK
           path: "app/build/outputs/apk/debug/*.apk"
+          
