@@ -52,6 +52,9 @@ public class M extends Activity {
     private boolean pendingListen = false;
     private long lastLevel = 0;
     private int utterance = 0;
+    private boolean recActive = false;
+    private final android.os.Handler h = new android.os.Handler(android.os.Looper.getMainLooper());
+    private final Runnable beginRec = this::beginRec;
 
     @Override
     protected void onCreate(Bundle b) {
@@ -117,20 +120,36 @@ public class M extends Activity {
             voiceEvent("error", "unavailable");
             return;
         }
+        // Cancel any old session first and start the new one a moment later.
+        // Starting right away makes many phones report "busy" and drop the new session.
+        h.removeCallbacks(beginRec);
+        recActive = false;
+        if (rec != null) rec.cancel();
+        h.postDelayed(beginRec, 250);
+    }
+
+    private void beginRec() {
         if (rec == null) {
             rec = SpeechRecognizer.createSpeechRecognizer(this);
             rec.setRecognitionListener(listener);
-        } else {
-            rec.cancel();
         }
         Intent i = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
         i.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
         i.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true);
         i.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1);
-        rec.startListening(i);
+        i.putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, getPackageName());
+        recActive = true;
+        try {
+            rec.startListening(i);
+        } catch (Exception e) {
+            recActive = false;
+            voiceEvent("error", "busy");
+        }
     }
 
     private void stopRec() {
+        h.removeCallbacks(beginRec);
+        recActive = false;
         if (rec != null) rec.cancel();
     }
 
@@ -159,6 +178,7 @@ public class M extends Activity {
 
         @Override
         public void onRmsChanged(float rms) {
+            if (!recActive) return;
             long now = System.currentTimeMillis();
             if (now - lastLevel < 80) return;
             lastLevel = now;
@@ -167,16 +187,22 @@ public class M extends Activity {
 
         @Override
         public void onPartialResults(Bundle b) {
+            if (!recActive) return;
             voiceEvent("partial", firstResult(b));
         }
 
         @Override
         public void onResults(Bundle b) {
+            if (!recActive) return;
+            recActive = false;
             voiceEvent("final", firstResult(b));
         }
 
         @Override
         public void onError(int e) {
+            // Ignore errors from a session we already cancelled
+            if (!recActive) return;
+            recActive = false;
             String code;
             switch (e) {
                 case SpeechRecognizer.ERROR_NO_MATCH:
