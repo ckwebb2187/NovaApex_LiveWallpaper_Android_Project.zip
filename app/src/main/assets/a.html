@@ -90,7 +90,8 @@ textarea.inp{min-height:70px;resize:vertical;}
 #clock.f-serif{font-family:Georgia,"Times New Roman",serif;font-weight:400;font-style:italic;}
 
 body.wallpaper .hud-top,body.wallpaper .quick-dock,body.wallpaper .drawer,body.wallpaper #drawerToggle,
-body.wallpaper #hotkeys,body.wallpaper #askBar,body.wallpaper #caption{display:none;}
+body.wallpaper #hotkeys,body.wallpaper #askBar{display:none;}
+body.wallpaper #caption{bottom:auto;top:66%;}
 </style>
 </head>
 <body>
@@ -246,8 +247,7 @@ body.wallpaper #hotkeys,body.wallpaper #askBar,body.wallpaper #caption{display:n
       <button class="opt-btn" data-vt="bgListen">On wallpaper &amp; home screen</button>
       <button class="opt-btn" data-vt="bgScreenOff">Also with screen off</button>
     </div>
-    <button class="opt-btn" id="btnPopUp" style="width:100%;margin-top:8px">Allow Nova to pop up (display over other apps)</button>
-    <div class="note" id="bgNote">Nova keeps a "Nova is listening" notification while it listens in the background — Android requires it. Screen-off listening uses noticeably more battery.</div>
+    <div class="note" id="bgNote">Nova answers right on the wallpaper or lock screen without opening the app. A "Nova is listening" notification stays while it listens — Android requires it. Screen-off listening uses noticeably more battery.</div>
 
     <div class="slider-row" style="margin-top:12px"><span>Voice speed</span><input type="range" id="rngVoiceRate" min="0.6" max="1.6" step="0.05"><b id="valVoiceRate"></b></div>
 
@@ -344,6 +344,7 @@ const KEY_DEFAULTS = { gemini: '', claude: '', geminiModel: 'gemini-2.5-flash', 
 const params = new URLSearchParams(location.search);
 const mode = params.get('mode') || 'studio';
 const isWall = mode === 'wallpaper';
+const isAgent = mode === 'agent';   // hidden copy run by the background listener
 if (isWall) document.body.classList.add('wallpaper');
 
 function readJson(k) {
@@ -912,7 +913,7 @@ function buildUI() {
     if (k === 'bgScreenOff' && cfg.voice.bgScreenOff && !cfg.voice.bgListen) { cfg.voice.bgListen = true; saveCfg(); updateUI(); }
     if (k === 'bgListen' || k === 'bgScreenOff') syncBg();
   });
-  $('btnPopUp').onclick = () => { if (hasNative('openPopUpSettings')) Android.openPopUpSettings(); };
+
   $('rngVoiceRate').oninput = e => { cfg.voice.rate = parseFloat(e.target.value); saveCfg(); updateUI(); };
   $('inpWake').value = cfg.voice.wake;
   $('inpWake').oninput = e => { cfg.voice.wake = e.target.value; saveCfg(); };
@@ -985,9 +986,10 @@ function runAction(a, v, quiet) {
     case 'speak': msg = v; break;
     case 'apply':
       saveCfg();
-      if (hasNative('applyWallpaper')) Android.applyWallpaper();
-      else alert('Open this in the Nova Apex app to set the wallpaper.');
-      msg = 'Opening wallpaper settings.'; break;
+      if (hasNative('applyWallpaper')) { Android.applyWallpaper(); msg = 'Opening wallpaper settings.'; }
+      else if (isAgent) msg = 'Open the Nova app to set the wallpaper.';
+      else { alert('Open this in the Nova Apex app to set the wallpaper.'); msg = ''; }
+      break;
   }
   pulse();
   if (quiet) { if (msg) showCaption('', msg); return ''; }
@@ -1070,6 +1072,7 @@ function matchCommand(text) {
 // ===== Captions =====
 let capTimer = 0;
 function showCaption(you, text) {
+  if (isAgent && hasNative('setCaption')) Android.setCaption(you || '', text || '');
   $('capYou').textContent = you ? 'You: ' + you : '';
   $('capText').textContent = text;
   $('caption').classList.add('show');
@@ -1077,7 +1080,11 @@ function showCaption(you, text) {
   capTimer = setTimeout(() => $('caption').classList.remove('show'), 12000);
 }
 
-function setLive(s) { live = s; updateUI(); }
+function setLive(s) {
+  live = s;
+  updateUI();
+  if (isAgent && hasNative('setState')) Android.setState(s || '');
+}
 
 // ===== Speech (native Android, with a browser fallback for testing) =====
 let listening = false, listenMode = null, listenAfterSpeech = false, browserRec = null;
@@ -1221,13 +1228,13 @@ function say(text, you) {
 window.onTts = function (type) { if (type === 'done' && live === 'speaking') done(); };
 
 function done() {
+  if (listenAfterSpeech) { listenAfterSpeech = false; setLive('listening'); setTimeout(() => startListen('direct'), 300); return; }
   setLive(null);
-  if (listenAfterSpeech) { listenAfterSpeech = false; setTimeout(() => startListen('direct'), 300); return; }
   resumeHandsFree(600);
 }
 
 function resumeHandsFree(ms) {
-  if (!cfg.voice.handsFree || isWall) return;
+  if (!cfg.voice.handsFree || isWall || isAgent) return;
   setTimeout(() => {
     if (cfg.voice.handsFree && !listening && !live && !document.hidden) startListen('wake');
   }, ms);
@@ -1284,6 +1291,7 @@ async function askAI(text, isTest) {
   const name = provider === 'claude' ? 'Claude' : 'Gemini';
   const you = isTest ? '' : text;
   if (!key) {
+    if (isAgent) { say('Add your ' + name + ' API key in the Nova app first.', you); return; }
     setLive(null);
     showCaption(you, 'Add your ' + name + ' API key in Settings › AI first.');
     resumeHandsFree(1500);
@@ -1322,6 +1330,7 @@ async function askAI(text, isTest) {
     }
   }
   if (res.status !== 200 || !reply) {
+    if (isAgent) { say(res.status === 200 ? name + ' sent an empty reply.' : errorText(name, res).replace(' Check it in Settings › AI.', ''), you); return; }
     setLive(null);
     showCaption(you, res.status === 200 ? name + ' sent an empty reply.' : errorText(name, res));
     resumeHandsFree(2000);
@@ -1339,16 +1348,11 @@ function syncBg() {
 }
 
 function updateBgStatus() {
-  if (!hasNative('canPopUp')) return;
-  const pop = Android.canPopUp();
-  $('btnPopUp').textContent = pop ? '✓ Nova can pop up over other apps' : 'Allow Nova to pop up (display over other apps)';
-  $('btnPopUp').classList.toggle('act', pop);
+  if (!hasNative('isBackgroundListening')) return;
   if (cfg.voice.bgListen && !Android.isBackgroundListening()) {
     $('bgNote').textContent = 'Background listening is off. Make sure Nova has microphone permission, then turn it on again.';
-  } else if (cfg.voice.bgListen && !pop) {
-    $('bgNote').textContent = 'Listening. Without the pop-up permission, Nova shows a notification you tap after the wake word.';
   } else {
-    $('bgNote').textContent = 'Nova keeps a "Nova is listening" notification while it listens in the background — Android requires it. Screen-off listening uses noticeably more battery.';
+    $('bgNote').textContent = 'Nova answers right on the wallpaper or lock screen without opening the app. A "Nova is listening" notification stays while it listens — Android requires it. Screen-off listening uses noticeably more battery.';
   }
 }
 
@@ -1357,6 +1361,26 @@ window.voiceCommand = function (text) {
   pulse();
   setTimeout(() => handleUtterance(text), 300);
 };
+
+// Called by the background listener after the wake word (rest = words after it)
+window.wakeHeard = function (rest) {
+  // Pick up any settings, commands or keys changed in the app since this page loaded
+  cfg = loadCfg();
+  keys = Object.assign({}, KEY_DEFAULTS, readJson(KEYS_KEY));
+  if (rest) handleUtterance(rest);
+  else { listenAfterSpeech = true; say('Yes?', ''); }
+};
+
+// Wallpaper: the background assistant tells it what Nova is doing
+window.setLiveState = function (s) {
+  live = STATES[s] ? s : null;
+  if (!live) targetLevel = 0;
+  updateUI();
+};
+window.setVoiceLevel = function (rms) {
+  targetLevel = Math.max(targetLevel, Math.min(1, Math.max(0, (parseFloat(rms) + 2) / 12)));
+};
+window.pulseNow = function () { pulse(); };
 
 // ===== In-app updates =====
 const RELEASES = 'https://api.github.com/repos/ckwebb2187/NovaApex_LiveWallpaper_Android_Project.zip/releases/latest';
@@ -1441,9 +1465,11 @@ buildParticles();
 buildStars();
 if (!isWall) buildUI();
 updateUI();
-setInterval(tickClock, 1000);
-startLoop();
-if (!isWall) {
+if (!isAgent) {
+  setInterval(tickClock, 1000);
+  startLoop();
+}
+if (mode === 'studio') {
   if (params.get('say')) setTimeout(() => window.voiceCommand(params.get('say')), 700);
   else if (params.get('listen') === '1') setTimeout(() => startListen('direct'), 700);
   else resumeHandsFree(1000);

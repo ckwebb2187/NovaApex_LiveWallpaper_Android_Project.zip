@@ -20,6 +20,14 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
 public class S extends WallpaperService {
+    // Wallpaper pages currently running, so the background assistant can animate them
+    static final java.util.Set<WebView> walls = new java.util.HashSet<>();
+
+    // Runs JS on every wallpaper page (main thread only)
+    static void toWalls(String code) {
+        for (WebView w : walls) w.evaluateJavascript(code, null);
+    }
+
     @Override
     public Engine onCreateEngine() {
         return new E();
@@ -62,6 +70,7 @@ public class S extends WallpaperService {
                 }
             }, "Android");
             wv.loadUrl("file:///android_asset/a.html?mode=wallpaper");
+            walls.add(wv);
             return wv;
         }
 
@@ -104,7 +113,10 @@ public class S extends WallpaperService {
             pres = null;
             if (vd != null) vd.release();
             vd = null;
-            if (v != null) v.destroy();
+            if (v != null) {
+                walls.remove(v);
+                v.destroy();
+            }
             v = null;
         }
 
