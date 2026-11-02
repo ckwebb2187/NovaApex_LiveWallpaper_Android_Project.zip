@@ -13,28 +13,43 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Install Gradle 8.5
-        run: |
-          wget -q https://services.gradle.org/distributions/gradle-8.5-bin.zip -P /tmp
-          sudo unzip -q -o /tmp/gradle-8.5-bin.zip -d /opt/gradle
-
       - name: Build APK with Gradle 8.5
         run: |
-          for f in *.zip; do
-            [ -f "$f" ] && unzip -q -o "$f"
+          set -e
+
+          # 1. Unzip project if uploaded as zip
+          for z in *.zip; do
+            if [ -f "$z" ]; then
+              echo "Extracting: $z"
+              unzip -q -o "$z"
+            fi
           done
 
-          PROJECT_DIR=$(find . -name "settings.gradle" -exec dirname {} \; | head -n 1)
-          if [ -n "$PROJECT_DIR" ]; then
-            cd "$PROJECT_DIR"
+          # 2. Find settings.gradle
+          SETTINGS=$(find . -name "settings.gradle" | head -n 1)
+          if [ -z "$SETTINGS" ]; then
+            echo "ERROR: settings.gradle not found!"
+            ls -la
+            exit 1
           fi
 
-          echo "sdk.dir=/usr/local/lib/android/sdk" > local.properties
+          BUILD_DIR=$(dirname "$SETTINGS")
+          echo "Building inside directory: $BUILD_DIR"
+          cd "$BUILD_DIR"
 
-          /opt/gradle/gradle-8.5/bin/gradle assembleDebug --no-daemon 2>&1 | tee build.log || (echo "=== ERROR SUMMARY ===" && grep -A 8 "What went wrong" build.log && exit 1)
+          # 3. Download and use exact Gradle 8.5
+          if [ ! -d "/tmp/gradle-8.5" ]; then
+            echo "Downloading Gradle 8.5..."
+            curl -sLo /tmp/gradle.zip https://services.gradle.org/distributions/gradle-8.5-bin.zip
+            unzip -q -o /tmp/gradle.zip -d /tmp
+          fi
+
+          echo "Compiling Android Live Wallpaper APK..."
+          /tmp/gradle-8.5/bin/gradle assembleDebug --no-daemon
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: NovaApex-LiveWallpaper-APK
           path: "**/app/build/outputs/apk/debug/*.apk"
+          
