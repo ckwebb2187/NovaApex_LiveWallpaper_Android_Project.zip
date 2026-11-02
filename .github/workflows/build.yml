@@ -15,22 +15,24 @@ jobs:
 
       - name: Install Gradle 8.5
         run: |
-          wget -q https://services.gradle.org/distributions/gradle-8.5-bin.zip
-          sudo unzip -q -d /opt/gradle gradle-8.5-bin.zip
-          echo "/opt/gradle/gradle-8.5/bin" >> $GITHUB_PATH
+          wget -q https://services.gradle.org/distributions/gradle-8.5-bin.zip -P /tmp
+          sudo unzip -q -o /tmp/gradle-8.5-bin.zip -d /opt/gradle
+          /opt/gradle/gradle-8.5/bin/gradle --version
 
       - name: Build APK with Gradle 8.5
         run: |
           for f in *.zip; do
-            [ -f "$f" ] && unzip -o "$f"
+            [ -f "$f" ] && unzip -q -o "$f"
           done
-          
+
           PROJECT_DIR=$(find . -name "settings.gradle" -exec dirname {} \; | head -n 1)
           if [ -n "$PROJECT_DIR" ]; then
             cd "$PROJECT_DIR"
           fi
-          
-          gradle assembleDebug --no-daemon
+          echo "Building inside: $(pwd)"
+
+          echo "sdk.dir=$ANDROID_HOME" > local.properties
+          /opt/gradle/gradle-8.5/bin/gradle assembleDebug --no-daemon --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
