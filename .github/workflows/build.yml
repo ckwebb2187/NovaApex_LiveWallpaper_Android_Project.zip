@@ -11,11 +11,18 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
       - name: Build APK with Gradle
-        run: chmod +x gradlew && ./gradlew assembleDebug
+        run: |
+          if [ -d "NovaApex_LiveWallpaper" ]; then
+            cd NovaApex_LiveWallpaper
+          fi
+          gradle wrapper
+          chmod +x gradlew
+          ./gradlew assembleDebug
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: NovaApex-LiveWallpaper-APK
-          path: app/build/outputs/apk/debug/app-debug.apk
-          
+          path: "**/app/build/outputs/apk/debug/app-debug.apk"
