@@ -6,6 +6,7 @@
 <title>Nova Apex Studio</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;}
+input,textarea,select{user-select:text;-webkit-user-select:text;}
 html,body{width:100%;height:100%;}
 body{background:#060913;color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;overflow:hidden;}
 #bgCanvas{position:fixed;inset:0;width:100%;height:100%;z-index:1;touch-action:none;}
@@ -14,30 +15,62 @@ body{background:#060913;color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFo
 .pill{background:rgba(15,23,42,0.75);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid rgba(56,189,248,0.35);padding:6px 14px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:0.8px;color:var(--p);display:flex;align-items:center;gap:6px;box-shadow:0 4px 15px rgba(0,0,0,0.4);}
 .dot{width:7px;height:7px;border-radius:50%;background:#10b981;box-shadow:0 0 8px #10b981;}
 
-.quick-dock{position:fixed;bottom:28px;left:50%;transform:translateX(-50%);z-index:10;display:flex;gap:8px;background:rgba(15,23,42,0.8);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);padding:6px;border-radius:18px;border:1px solid rgba(255,255,255,0.1);box-shadow:0 10px 30px rgba(0,0,0,0.6);}
-.qbtn{padding:8px 14px;border-radius:12px;font-size:11px;font-weight:700;color:#94a3b8;background:transparent;border:0;cursor:pointer;letter-spacing:0.5px;}
+/* Bottom controls */
+.quick-dock{position:fixed;bottom:28px;left:50%;transform:translateX(-50%);z-index:10;display:flex;gap:6px;background:rgba(15,23,42,0.8);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);padding:6px;border-radius:18px;border:1px solid rgba(255,255,255,0.1);box-shadow:0 10px 30px rgba(0,0,0,0.6);}
+.qbtn{padding:9px 13px;border-radius:12px;font-size:11px;font-weight:800;color:#94a3b8;background:transparent;border:0;cursor:pointer;letter-spacing:0.6px;white-space:nowrap;}
 .qbtn.act{color:#060913;background:var(--p);}
+#qTalkBtn.live{color:#060913;background:var(--p);box-shadow:0 0 18px var(--p);animation:breathe 1.2s ease-in-out infinite;}
+@keyframes breathe{50%{box-shadow:0 0 4px var(--p);}}
+#hotkeys{position:fixed;bottom:86px;left:12px;right:12px;z-index:10;display:flex;gap:6px;justify-content:center;flex-wrap:wrap;}
+.hk{padding:6px 12px;border-radius:14px;font-size:11px;font-weight:700;color:var(--p);background:rgba(15,23,42,0.75);border:1px solid rgba(255,255,255,0.12);cursor:pointer;}
+#askBar{position:fixed;bottom:86px;left:12px;right:12px;z-index:12;display:none;gap:8px;}
+#askBar.open{display:flex;}
+#askBar input{flex:1;}
+#caption{position:fixed;left:16px;right:16px;bottom:140px;z-index:9;text-align:center;pointer-events:none;opacity:0;transition:opacity .4s;}
+#caption.show{opacity:1;}
+#caption div{display:inline-block;max-width:100%;background:rgba(10,15,30,0.82);border:1px solid rgba(255,255,255,0.1);border-radius:14px;padding:10px 14px;font-size:13px;line-height:1.45;max-height:30vh;overflow:hidden;}
+#capYou{color:#94a3b8;font-size:11px;margin-bottom:4px;display:block;}
 
-.drawer{position:fixed;left:0;right:0;bottom:0;z-index:20;background:rgba(10,15,30,0.94);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-top:1px solid rgba(255,255,255,0.08);border-radius:22px 22px 0 0;transform:translateY(100%);transition:transform .3s ease;max-height:78vh;overflow-y:auto;padding:18px 18px 28px;}
+/* Settings drawer */
+.drawer{position:fixed;left:0;right:0;bottom:0;z-index:20;background:rgba(10,15,30,0.95);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-top:1px solid rgba(255,255,255,0.08);border-radius:22px 22px 0 0;transform:translateY(100%);transition:transform .3s ease;max-height:80vh;overflow-y:auto;padding:14px 18px 28px;}
 .drawer.open{transform:translateY(0);}
 #drawerToggle{position:fixed;right:18px;top:84px;z-index:21;width:44px;height:44px;border-radius:50%;border:1px solid rgba(255,255,255,0.15);background:rgba(15,23,42,0.85);color:var(--p);font-size:18px;font-weight:700;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:transform .3s;}
 #drawerToggle.open{transform:rotate(90deg);}
+.tabs{display:flex;gap:6px;position:sticky;top:-14px;background:rgba(10,15,30,0.98);padding:4px 0 10px;z-index:2;}
+.tabs button{flex:1;padding:9px 0;border-radius:10px;border:1px solid rgba(255,255,255,0.08);background:rgba(30,41,59,0.5);color:#94a3b8;font-size:12px;font-weight:800;letter-spacing:0.5px;}
+.tabs button.act{color:#060913;background:var(--p);border-color:var(--p);}
+.tab{display:none;}
+.tab.act{display:block;}
 .sec-label{font-size:10px;font-weight:700;letter-spacing:1.2px;color:#64748b;margin:16px 0 8px;text-transform:uppercase;}
-.sec-label:first-child{margin-top:0;}
+.note{font-size:11px;color:#64748b;line-height:1.5;margin-top:8px;}
 .swatch-row{display:flex;gap:10px;}
 .swatch{width:38px;height:38px;border-radius:50%;border:2px solid transparent;cursor:pointer;}
 .swatch.act{border-color:#fff;box-shadow:0 0 12px rgba(255,255,255,0.4);}
 .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
-.opt-btn{padding:10px;border-radius:12px;border:1px solid rgba(255,255,255,0.1);background:rgba(30,41,59,0.6);color:#cbd5e1;font-size:12px;font-weight:700;cursor:pointer;}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
+.grid-3+.grid-3,.grid-2+.grid-3,.grid-2+.grid-2{margin-top:8px;}
+.opt-btn{padding:10px 6px;border-radius:12px;border:1px solid rgba(255,255,255,0.1);background:rgba(30,41,59,0.6);color:#cbd5e1;font-size:12px;font-weight:700;cursor:pointer;}
 .opt-btn.act{border-color:var(--p);color:var(--p);background:rgba(56,189,248,0.08);}
 .slider-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
-.slider-row span{font-size:12px;color:#cbd5e1;width:70px;}
+.slider-row span{font-size:12px;color:#cbd5e1;width:78px;}
 .slider-row b{font-size:12px;color:var(--p);width:38px;text-align:right;}
 .slider-row input{flex:1;accent-color:var(--p);}
+.inp{width:100%;padding:10px 12px;border-radius:10px;border:1px solid rgba(255,255,255,0.12);background:rgba(15,23,42,0.9);color:#f1f5f9;font-size:13px;font-family:inherit;outline:none;}
+.inp:focus{border-color:var(--p);}
+textarea.inp{min-height:70px;resize:vertical;}
+.field{margin-bottom:8px;}
+.field label{display:block;font-size:11px;color:#94a3b8;margin-bottom:4px;}
+.send-btn{padding:0 16px;border-radius:10px;border:0;background:var(--p);color:#060913;font-weight:800;font-size:12px;}
 .apply-btn{margin-top:20px;width:100%;padding:14px;border:0;border-radius:14px;font-size:14px;font-weight:800;letter-spacing:0.8px;color:#060913;background:var(--p);box-shadow:0 6px 20px rgba(0,0,0,0.5);cursor:pointer;}
+.cmd{border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:10px;margin-bottom:8px;background:rgba(15,23,42,0.5);}
+.cmd-row{display:flex;gap:6px;align-items:center;}
+.cmd-row+.cmd-row{margin-top:6px;}
+.cmd-row .inp{padding:8px 10px;font-size:12px;}
+.cmd-del{width:34px;height:34px;flex:none;border-radius:10px;border:1px solid rgba(255,255,255,0.12);background:transparent;color:#f87171;font-weight:800;}
+.cmd-hk{flex:none;font-size:11px;color:#94a3b8;display:flex;align-items:center;gap:4px;}
+.cmd-hk input{accent-color:var(--p);}
 
-.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
-.grid-3+.grid-3,.grid-2+.grid-3{margin-top:8px;}
+/* Clock */
 .color-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
 .cswatch{width:30px;height:30px;border-radius:50%;border:2px solid transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#060913;}
 .cswatch.act{border-color:#fff;box-shadow:0 0 10px rgba(255,255,255,0.4);}
@@ -55,7 +88,9 @@ body{background:#060913;color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFo
 #clock.f-heavy{font-weight:900;letter-spacing:-1px;}
 #clock.f-mono{font-family:"Courier New",ui-monospace,monospace;font-weight:700;}
 #clock.f-serif{font-family:Georgia,"Times New Roman",serif;font-weight:400;font-style:italic;}
-body.wallpaper .hud-top,body.wallpaper .quick-dock,body.wallpaper .drawer,body.wallpaper #drawerToggle{display:none;}
+
+body.wallpaper .hud-top,body.wallpaper .quick-dock,body.wallpaper .drawer,body.wallpaper #drawerToggle,
+body.wallpaper #hotkeys,body.wallpaper #askBar,body.wallpaper #caption{display:none;}
 </style>
 </head>
 <body>
@@ -68,85 +103,167 @@ body.wallpaper .hud-top,body.wallpaper .quick-dock,body.wallpaper .drawer,body.w
   <div class="pill" id="aiPill"><span id="aiIcon">✦</span><span id="aiLabel">GEMINI</span></div>
 </div>
 
+<div id="caption"><div><span id="capYou"></span><span id="capText"></span></div></div>
+<div id="hotkeys"></div>
+<div id="askBar"><input class="inp" id="inpPrompt" placeholder="Ask Nova or type a command…"><button class="send-btn" id="btnSendPrompt">SEND</button></div>
+
 <div class="quick-dock" id="quickDock">
-  <button class="qbtn act" id="qStateBtn">STATE</button>
-  <button class="qbtn" id="qPulseBtn">PULSE</button>
-  <button class="qbtn" id="qAiBtn">CORE</button>
+  <button class="qbtn" id="qTalkBtn">🎙 TALK</button>
+  <button class="qbtn" id="qAskBtn">⌨ ASK</button>
+  <button class="qbtn" id="qPulseBtn">⚡ PULSE</button>
+  <button class="qbtn" id="qSceneBtn">◈ SCENE</button>
 </div>
 
 <button id="drawerToggle"><span id="drawerArrow">⚙</span></button>
 
 <div class="drawer" id="drawer">
-  <div class="sec-label">Theme</div>
-  <div class="swatch-row" id="swatches"></div>
-
-  <div class="sec-label">Core style</div>
-  <div class="grid-2">
-    <button class="opt-btn" data-ai="gemini">✦ Gemini</button>
-    <button class="opt-btn" data-ai="claude">✳ Claude</button>
+  <div class="tabs">
+    <button data-tab="look" class="act">LOOK</button>
+    <button data-tab="clock">CLOCK</button>
+    <button data-tab="ai">AI</button>
+    <button data-tab="voice">VOICE</button>
   </div>
 
-  <div class="sec-label">State</div>
-  <div class="grid-2" id="stateBtns"></div>
+  <!-- LOOK -->
+  <div class="tab act" id="tab-look">
+    <div class="sec-label">Theme</div>
+    <div class="swatch-row" id="swatches"></div>
 
-  <div class="sec-label">Clock</div>
-  <div class="grid-2">
-    <button class="opt-btn" data-clk="on" data-val="true">Clock on</button>
-    <button class="opt-btn" data-clk="on" data-val="false">Clock off</button>
+    <div class="sec-label">Scene</div>
+    <div class="grid-3" id="sceneBtns"></div>
+
+    <div class="sec-label">Layers (mix your own)</div>
+    <div class="grid-2" id="layerBtns"></div>
+
+    <div class="sec-label">State</div>
+    <div class="grid-2" id="stateBtns"></div>
+
+    <div class="sec-label">Tuning</div>
+    <div class="slider-row"><span>Speed</span><input type="range" id="rngSpeed" min="0.2" max="3" step="0.1"><b id="valSpeed"></b></div>
+    <div class="slider-row"><span>Particles</span><input type="range" id="rngParticles" min="0" max="300" step="10"><b id="valParticles"></b></div>
+    <div class="slider-row"><span>Arcs</span><input type="range" id="rngArcs" min="0" max="1" step="0.05"><b id="valArcs"></b></div>
+    <div class="slider-row"><span>Size</span><input type="range" id="rngSize" min="0.5" max="1.8" step="0.05"><b id="valSize"></b></div>
+
+    <div class="sec-label">Wallpaper quality</div>
+    <div class="grid-3">
+      <button class="opt-btn" data-quality="battery">Battery</button>
+      <button class="opt-btn" data-quality="balanced">Balanced</button>
+      <button class="opt-btn" data-quality="ultra">Ultra</button>
+    </div>
+    <div class="note">Battery runs the wallpaper at 24 fps, Balanced at 30 fps, and Ultra at 60 fps with extra detail.</div>
   </div>
 
-  <div class="sec-label">Clock style</div>
-  <div class="grid-3" id="clockStyles"></div>
+  <!-- CLOCK -->
+  <div class="tab" id="tab-clock">
+    <div class="sec-label">Clock</div>
+    <div class="grid-2">
+      <button class="opt-btn" data-clk="on" data-val="true">Clock on</button>
+      <button class="opt-btn" data-clk="on" data-val="false">Clock off</button>
+    </div>
 
-  <div class="sec-label">Clock position</div>
-  <div class="grid-3">
-    <button class="opt-btn" data-clk="pos" data-val="top">Top</button>
-    <button class="opt-btn" data-clk="pos" data-val="middle">Middle</button>
-    <button class="opt-btn" data-clk="pos" data-val="bottom">Bottom</button>
+    <div class="sec-label">Clock style</div>
+    <div class="grid-3" id="clockStyles"></div>
+
+    <div class="sec-label">Position</div>
+    <div class="grid-3">
+      <button class="opt-btn" data-clk="pos" data-val="top">Top</button>
+      <button class="opt-btn" data-clk="pos" data-val="middle">Middle</button>
+      <button class="opt-btn" data-clk="pos" data-val="bottom">Bottom</button>
+    </div>
+
+    <div class="sec-label">Format</div>
+    <div class="grid-2">
+      <button class="opt-btn" data-clk="h24" data-val="false">12-hour</button>
+      <button class="opt-btn" data-clk="h24" data-val="true">24-hour</button>
+    </div>
+    <div class="grid-3">
+      <button class="opt-btn" data-clk-toggle="secs">Seconds</button>
+      <button class="opt-btn" data-clk-toggle="date">Date</button>
+      <button class="opt-btn" data-clk-toggle="glow">Glow</button>
+    </div>
+
+    <div class="sec-label">Font</div>
+    <div class="grid-3">
+      <button class="opt-btn" data-clk="font" data-val="thin">Thin</button>
+      <button class="opt-btn" data-clk="font" data-val="sans">Sans</button>
+      <button class="opt-btn" data-clk="font" data-val="heavy">Heavy</button>
+      <button class="opt-btn" data-clk="font" data-val="mono">Mono</button>
+      <button class="opt-btn" data-clk="font" data-val="serif">Serif</button>
+    </div>
+
+    <div class="sec-label">Color</div>
+    <div class="color-row" id="clockColors"><input type="color" id="clockColor"></div>
+
+    <div class="slider-row" style="margin-top:12px"><span>Clock size</span><input type="range" id="rngClockSize" min="0.5" max="2" step="0.05"><b id="valClockSize"></b></div>
   </div>
 
-  <div class="sec-label">Clock format</div>
-  <div class="grid-2">
-    <button class="opt-btn" data-clk="h24" data-val="false">12-hour</button>
-    <button class="opt-btn" data-clk="h24" data-val="true">24-hour</button>
+  <!-- AI -->
+  <div class="tab" id="tab-ai">
+    <div class="sec-label">Assistant</div>
+    <div class="grid-2">
+      <button class="opt-btn" data-ai="gemini">✦ Gemini</button>
+      <button class="opt-btn" data-ai="claude">✳ Claude</button>
+    </div>
+
+    <div class="sec-label">Gemini</div>
+    <div class="field"><label>API key</label><input class="inp" type="password" id="inpGeminiKey" placeholder="Paste your Gemini API key" autocomplete="off"></div>
+    <div class="field"><label>Model</label><input class="inp" id="inpGeminiModel" autocomplete="off"></div>
+
+    <div class="sec-label">Claude</div>
+    <div class="field"><label>API key</label><input class="inp" type="password" id="inpClaudeKey" placeholder="Paste your Claude API key" autocomplete="off"></div>
+    <div class="field"><label>Model</label>
+      <select class="inp" id="selClaudeModel">
+        <option value="claude-haiku-5-5">Haiku 5.5 (fastest)</option>
+        <option value="claude-sonnet-5-5">Sonnet 5.5 (balanced)</option>
+        <option value="claude-opus-5-5">Opus 5.5 (smartest)</option>
+      </select>
+    </div>
+
+    <div class="sec-label">Personality</div>
+    <textarea class="inp" id="inpPersona"></textarea>
+
+    <div class="grid-2" style="margin-top:10px">
+      <button class="opt-btn" id="btnTestAi">Test connection</button>
+      <button class="opt-btn" id="btnClearChat">Clear chat memory</button>
+    </div>
+    <div class="note">Keys are saved only on this phone. They are sent only to Google (Gemini) or Anthropic (Claude) when you ask something.</div>
   </div>
-  <div class="grid-3">
-    <button class="opt-btn" data-clk-toggle="secs">Seconds</button>
-    <button class="opt-btn" data-clk-toggle="date">Date</button>
-    <button class="opt-btn" data-clk-toggle="glow">Glow</button>
+
+  <!-- VOICE -->
+  <div class="tab" id="tab-voice">
+    <div class="sec-label">Voice</div>
+    <div class="grid-2">
+      <button class="opt-btn" data-vt="speak">Speak replies</button>
+      <button class="opt-btn" data-vt="handsFree">Hands-free</button>
+    </div>
+    <div class="grid-2">
+      <button class="opt-btn" data-vt="wallTap">Double-tap wallpaper to talk</button>
+      <button class="opt-btn" data-vt="hotkeys">Show hotkeys</button>
+    </div>
+    <div class="slider-row" style="margin-top:12px"><span>Voice speed</span><input type="range" id="rngVoiceRate" min="0.6" max="1.6" step="0.05"><b id="valVoiceRate"></b></div>
+
+    <div class="sec-label">Wake word</div>
+    <input class="inp" id="inpWake" autocomplete="off">
+    <div class="note">In hands-free mode, Nova listens while the app is open and only responds after the wake word, like "Hey Nova, hyperdrive." Android plays a short tone each time listening restarts. Hands-free stays off on the wallpaper to save battery and keep the mic private.</div>
+
+    <div class="sec-label">Commands &amp; hotkeys</div>
+    <div id="cmdList"></div>
+    <button class="opt-btn" id="btnAddCmd" style="width:100%">+ Add command</button>
+    <div class="note">Say or type a phrase to run its action. Check "Hotkey" to also get a tap button on the main screen. Anything that doesn't match a command goes to the AI.</div>
   </div>
-
-  <div class="sec-label">Clock font</div>
-  <div class="grid-3">
-    <button class="opt-btn" data-clk="font" data-val="thin">Thin</button>
-    <button class="opt-btn" data-clk="font" data-val="sans">Sans</button>
-    <button class="opt-btn" data-clk="font" data-val="heavy">Heavy</button>
-    <button class="opt-btn" data-clk="font" data-val="mono">Mono</button>
-    <button class="opt-btn" data-clk="font" data-val="serif">Serif</button>
-  </div>
-
-  <div class="sec-label">Clock color</div>
-  <div class="color-row" id="clockColors"><input type="color" id="clockColor"></div>
-
-  <div class="slider-row" style="margin-top:12px"><span>Clock size</span><input type="range" id="rngClockSize" min="0.5" max="2" step="0.05"><b id="valClockSize"></b></div>
-
-  <div class="sec-label">Tuning</div>
-  <div class="slider-row"><span>Speed</span><input type="range" id="rngSpeed" min="0.2" max="3" step="0.1"><b id="valSpeed"></b></div>
-  <div class="slider-row"><span>Particles</span><input type="range" id="rngParticles" min="20" max="300" step="10"><b id="valParticles"></b></div>
-  <div class="slider-row"><span>Arcs</span><input type="range" id="rngArcs" min="0" max="1" step="0.05"><b id="valArcs"></b></div>
-  <div class="slider-row"><span>Size</span><input type="range" id="rngSize" min="0.5" max="1.8" step="0.05"><b id="valSize"></b></div>
 
   <button class="apply-btn" id="applyBtn">SET AS LIVE WALLPAPER</button>
 </div>
 
 <script>
-// Themes: p = primary, a = accent
+// ===== Config =====
 const THEMES = {
   cyan:    { p: '#38bdf8', a: '#6366f1' },
   violet:  { p: '#a78bfa', a: '#ec4899' },
   ember:   { p: '#fb923c', a: '#ef4444' },
   emerald: { p: '#34d399', a: '#0ea5e9' },
-  rose:    { p: '#f472b6', a: '#f59e0b' }
+  rose:    { p: '#f472b6', a: '#f59e0b' },
+  ice:     { p: '#e0f2fe', a: '#38bdf8' }
 };
 const STATES = {
   idle:      { label: 'IDLE',      rate: 0.6, dot: '#10b981' },
@@ -155,63 +272,119 @@ const STATES = {
   speaking:  { label: 'SPEAKING',  rate: 1.3, dot: '#a78bfa' }
 };
 const STATE_KEYS = Object.keys(STATES);
-const DEFAULTS = { theme: 'cyan', ai: 'gemini', state: 'idle', speed: 1, particles: 120, arcs: 0.35, size: 1 };
-const KEY = 'novaApexCfg';
+const LAYERS = { sphere: 'Neural sphere', orbits: 'Atom orbits', rings: 'HUD rings', warp: 'Warp stars', grid: 'Holo grid', wave: 'Voice wave', scan: 'Scanlines' };
+const SCENES = {
+  neural:   { label: 'Neural Atom', layers: { sphere: 1, orbits: 0, rings: 0, warp: 0, grid: 0, wave: 0, scan: 0 } },
+  quantum:  { label: 'Quantum',     layers: { sphere: 0, orbits: 1, rings: 0, warp: 0, grid: 0, wave: 1, scan: 0 } },
+  reactor:  { label: 'Arc Reactor', layers: { sphere: 0, orbits: 0, rings: 1, warp: 0, grid: 0, wave: 1, scan: 0 } },
+  hyper:    { label: 'Hyperdrive',  layers: { sphere: 1, orbits: 0, rings: 0, warp: 1, grid: 0, wave: 0, scan: 0 } },
+  holo:     { label: 'Holo Deck',   layers: { sphere: 0, orbits: 1, rings: 1, warp: 0, grid: 1, wave: 0, scan: 1 } },
+  singular: { label: 'Singularity', layers: { sphere: 1, orbits: 1, rings: 1, warp: 1, grid: 0, wave: 1, scan: 1 } }
+};
+const SCENE_KEYS = Object.keys(SCENES);
+const QUALITY = {
+  battery:  { fps: 24, dpr: 1,   nodes: 60,  warp: 70 },
+  balanced: { fps: 30, dpr: 1.5, nodes: 90,  warp: 140 },
+  ultra:    { fps: 60, dpr: 2,   nodes: 120, warp: 240 }
+};
 
-// Clock presets. Picking one sets these fields; any single change after that makes it "custom".
 const CLOCK_STYLES = {
-  minimal: { label: 'Minimal', font: 'thin',  glow: false, size: 1,    secs: false, date: true },
-  neon:    { label: 'Neon',    font: 'sans',  glow: true,  size: 1,    secs: false, date: true },
-  digital: { label: 'Digital', font: 'mono',  glow: true,  size: 0.9,  secs: true,  date: false },
-  bold:    { label: 'Bold',    font: 'heavy', glow: false, size: 1.3,  secs: false, date: true },
-  classic: { label: 'Classic', font: 'serif', glow: false, size: 1.1,  secs: false, date: true }
+  minimal: { label: 'Minimal', font: 'thin',  glow: false, size: 1,   secs: false, date: true },
+  neon:    { label: 'Neon',    font: 'sans',  glow: true,  size: 1,   secs: false, date: true },
+  digital: { label: 'Digital', font: 'mono',  glow: true,  size: 0.9, secs: true,  date: false },
+  bold:    { label: 'Bold',    font: 'heavy', glow: false, size: 1.3, secs: false, date: true },
+  classic: { label: 'Classic', font: 'serif', glow: false, size: 1.1, secs: false, date: true }
 };
 const CLOCK_DEFAULTS = { on: true, style: 'neon', pos: 'top', h24: false, secs: false, date: true, glow: true, font: 'sans', size: 1, color: 'theme' };
 const CLOCK_COLORS = ['theme', '#ffffff', '#38bdf8', '#a78bfa', '#f472b6', '#fb923c', '#facc15', '#34d399'];
 
-const mode = new URLSearchParams(location.search).get('mode') || 'studio';
-if (mode === 'wallpaper') document.body.classList.add('wallpaper');
+const VOICE_DEFAULTS = { speak: true, handsFree: false, wallTap: true, hotkeys: true, rate: 1, wake: 'hey nova' };
+const DEFAULT_COMMANDS = [
+  { p: 'pulse', a: 'pulse', v: '', hk: true },
+  { p: 'next theme', a: 'nextTheme', v: '', hk: true },
+  { p: 'hyperdrive', a: 'scene', v: 'hyper', hk: true },
+  { p: 'arc reactor', a: 'scene', v: 'reactor', hk: false },
+  { p: 'toggle clock', a: 'toggleClock', v: '', hk: false },
+  { p: 'set wallpaper', a: 'apply', v: '', hk: false }
+];
+const DEFAULTS = {
+  theme: 'cyan', ai: 'gemini', state: 'idle', speed: 1, particles: 120, arcs: 0.35, size: 1,
+  quality: 'balanced', scene: 'neural', layers: Object.assign({}, SCENES.neural.layers)
+};
+const KEY = 'novaApexCfg';
+const KEYS_KEY = 'novaApexKeys';
+const PERSONA = 'You are Nova, a futuristic AI assistant that lives in the user\'s phone wallpaper. Answers are read aloud, so keep them short (1-3 sentences), friendly and confident. No markdown.';
+const KEY_DEFAULTS = { gemini: '', claude: '', geminiModel: 'gemini-2.5-flash', claudeModel: 'claude-haiku-5-5', persona: PERSONA };
 
-// Settings are shared between the studio and the wallpaper through localStorage
+const params = new URLSearchParams(location.search);
+const mode = params.get('mode') || 'studio';
+const isWall = mode === 'wallpaper';
+if (isWall) document.body.classList.add('wallpaper');
+
+function readJson(k) {
+  try { return JSON.parse(localStorage.getItem(k) || '{}') || {}; } catch (e) { return {}; }
+}
 function loadCfg() {
-  let c;
-  try { c = Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem(KEY) || '{}')); }
-  catch (e) { c = Object.assign({}, DEFAULTS); }
+  const c = Object.assign({}, DEFAULTS, readJson(KEY));
   c.clock = Object.assign({}, CLOCK_DEFAULTS, c.clock || {});
+  c.voice = Object.assign({}, VOICE_DEFAULTS, c.voice || {});
+  c.layers = Object.assign({}, DEFAULTS.layers, c.layers || {});
+  if (!Array.isArray(c.commands)) c.commands = DEFAULT_COMMANDS.map(x => Object.assign({}, x));
+  if (!THEMES[c.theme]) c.theme = DEFAULTS.theme;
+  if (!STATES[c.state]) c.state = DEFAULTS.state;
+  if (!QUALITY[c.quality]) c.quality = DEFAULTS.quality;
   return c;
 }
 function saveCfg() {
   try { localStorage.setItem(KEY, JSON.stringify(cfg)); } catch (e) {}
 }
 let cfg = loadCfg();
-if (!THEMES[cfg.theme]) cfg.theme = DEFAULTS.theme;
-if (!STATES[cfg.state]) cfg.state = DEFAULTS.state;
-
-const $ = id => document.getElementById(id);
-const canvas = $('bgCanvas');
-const ctx = canvas.getContext('2d');
-let W = 0, H = 0, dpr = 1;
-let nodes = [], particles = [];
-let rotX = 0.3, rotY = 0, drag = null, phase = 0, empWave = 0;
-
-function th() { return THEMES[cfg.theme]; }
-
-function resize() {
-  dpr = Math.min(window.devicePixelRatio || 1, 2);
-  W = window.innerWidth; H = window.innerHeight;
-  canvas.width = W * dpr; canvas.height = H * dpr;
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+let keys = Object.assign({}, KEY_DEFAULTS, readJson(KEYS_KEY));
+function saveKeys() {
+  try { localStorage.setItem(KEYS_KEY, JSON.stringify(keys)); } catch (e) {}
 }
 
-// Points spread evenly on a sphere
+const $ = id => document.getElementById(id);
+const hasNative = name => !!(window.Android && typeof Android[name] === 'function');
+
+// ===== Canvas & scene =====
+const canvas = $('bgCanvas');
+const ctx = canvas.getContext('2d');
+let W = 0, H = 0;
+let nodes = [], pairs = [], particles = [], stars = [];
+let rotX = 0.3, rotY = 0, drag = null, phase = 0, empWave = 0, gridOff = 0;
+let level = 0, targetLevel = 0;     // voice energy, 0..1
+let live = null;                    // temporary state while talking (listening/thinking/speaking)
+let scanPat = null;
+
+function th() { return THEMES[cfg.theme]; }
+function Q() { return QUALITY[cfg.quality]; }
+function curState() { return live || cfg.state; }
+
+function resize() {
+  const dpr = Math.min(window.devicePixelRatio || 1, isWall ? Q().dpr : 2);
+  W = window.innerWidth; H = window.innerHeight;
+  canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  scanPat = null;
+}
+
+// Points spread evenly on a sphere; links are worked out once, not every frame
 function buildNodes() {
-  nodes = [];
-  const n = 90;
+  nodes = []; pairs = [];
+  const n = Q().nodes;
   for (let i = 0; i < n; i++) {
     const y = 1 - (i / (n - 1)) * 2;
     const r = Math.sqrt(1 - y * y);
     const t = i * Math.PI * (3 - Math.sqrt(5));
     nodes.push({ x: Math.cos(t) * r, y: y, z: Math.sin(t) * r });
+  }
+  const lim = 0.12 * 90 / n;
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      const dx = nodes[i].x - nodes[j].x, dy = nodes[i].y - nodes[j].y, dz = nodes[i].z - nodes[j].z;
+      if (dx * dx + dy * dy + dz * dz < lim) pairs.push([i, j]);
+    }
   }
 }
 
@@ -226,59 +399,95 @@ function buildParticles() {
   }
 }
 
+function newStar(s) {
+  s = s || {};
+  s.x = (Math.random() - 0.5) * 2; s.y = (Math.random() - 0.5) * 2; s.z = Math.random() * 0.9 + 0.1;
+  return s;
+}
+function buildStars() {
+  stars = [];
+  for (let i = 0; i < Q().warp; i++) stars.push(newStar());
+}
+
 function project(p, cx, cy, rad) {
-  let x = p.x * Math.cos(rotY) - p.z * Math.sin(rotY);
+  const x = p.x * Math.cos(rotY) - p.z * Math.sin(rotY);
   let z = p.x * Math.sin(rotY) + p.z * Math.cos(rotY);
-  let y = p.y * Math.cos(rotX) - z * Math.sin(rotX);
+  const y = p.y * Math.cos(rotX) - z * Math.sin(rotX);
   z = p.y * Math.sin(rotX) + z * Math.cos(rotX);
   const s = 2.4 / (2.4 + z);
   return { x: cx + x * rad * s, y: cy + y * rad * s, z: z, s: s };
 }
 
-function render() {
-  const t = th();
-  const st = STATES[cfg.state];
-  const rate = cfg.speed * st.rate;
-  phase += 0.016 * rate;
-  if (!drag) { rotY += 0.004 * rate; }
+function drawGrid(t, k) {
+  const hz = H * 0.62;
+  gridOff = (gridOff + 0.012 * k) % 1;
+  // lines fade in from the horizon toward the bottom of the screen
+  const g = ctx.createLinearGradient(0, hz, 0, H);
+  g.addColorStop(0, 'rgba(0,0,0,0)');
+  g.addColorStop(1, t.a);
+  ctx.strokeStyle = g;
+  ctx.lineWidth = 1;
+  ctx.globalAlpha = 0.6;
+  ctx.beginPath();
+  for (let i = -14; i <= 14; i++) {
+    ctx.moveTo(W / 2 + i * 8, hz);
+    ctx.lineTo(W / 2 + i * W * 0.16, H);
+  }
+  for (let z = 1; z < 16; z++) {
+    const y = hz + (H - hz) / (z - gridOff + 0.0001) * 0.9;
+    if (y > H || y < hz) continue;
+    ctx.moveTo(0, y); ctx.lineTo(W, y);
+  }
+  ctx.stroke();
+  ctx.strokeStyle = t.p; ctx.globalAlpha = 0.5;
+  ctx.beginPath(); ctx.moveTo(0, hz); ctx.lineTo(W, hz); ctx.stroke();
+  ctx.globalAlpha = 1;
+}
 
-  ctx.fillStyle = '#060913';
-  ctx.fillRect(0, 0, W, H);
+function drawWarp(t, k, cx, cy) {
+  const sp = 0.006 * k * (curState() === 'thinking' ? 2.2 : 1);
+  const f = Math.max(W, H) * 0.15;
+  ctx.strokeStyle = t.p;
+  ctx.lineCap = 'round';
+  for (const s of stars) {
+    const pz = s.z;
+    s.z -= sp;
+    if (s.z <= 0.02) { newStar(s); s.z = 1; continue; }
+    ctx.globalAlpha = Math.min(1, (1 - s.z) * 1.2);
+    ctx.lineWidth = (1 - s.z) * 2.2;
+    ctx.beginPath();
+    ctx.moveTo(cx + s.x / pz * f, cy + s.y / pz * f);
+    ctx.lineTo(cx + s.x / s.z * f, cy + s.y / s.z * f);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1; ctx.lineCap = 'butt';
+}
 
-  // Background glow
-  const cx = W / 2, cy = H / 2;
-  const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(W, H) * 0.7);
-  glow.addColorStop(0, t.a + '33');
-  glow.addColorStop(1, '#06091300');
-  ctx.fillStyle = glow;
-  ctx.fillRect(0, 0, W, H);
-
-  // Drifting particles
+function drawParticles(t, k) {
   ctx.fillStyle = t.p;
   for (const p of particles) {
-    p.x += p.vx * rate; p.y += p.vy * rate;
+    p.x += p.vx * k; p.y += p.vy * k;
     if (p.x < 0) p.x = W; if (p.x > W) p.x = 0;
     if (p.y < 0) p.y = H; if (p.y > H) p.y = 0;
     ctx.globalAlpha = p.a;
-    ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
+    ctx.fillRect(p.x - p.r, p.y - p.r, p.r * 2, p.r * 2);
   }
   ctx.globalAlpha = 1;
+}
 
-  // Neural sphere
-  const rad = Math.min(W, H) * 0.32 * cfg.size * (1 + Math.sin(phase * 2) * 0.03);
-  const pts = nodes.map(n => project(n, cx, cy, rad));
+function drawSphere(t, cx, cy, R) {
+  const pts = nodes.map(n => project(n, cx, cy, R * (1 + Math.sin(phase * 2) * 0.03)));
+  ctx.strokeStyle = t.p;
   ctx.lineWidth = 0.6;
-  for (let i = 0; i < pts.length; i++) {
-    for (let j = i + 1; j < pts.length; j++) {
-      const dx = nodes[i].x - nodes[j].x, dy = nodes[i].y - nodes[j].y, dz = nodes[i].z - nodes[j].z;
-      const d = dx * dx + dy * dy + dz * dz;
-      if (d < 0.12) {
-        const depth = (pts[i].z + pts[j].z) / 2;
-        ctx.strokeStyle = t.p;
-        ctx.globalAlpha = Math.max(0.05, 0.35 - depth * 0.25) * (1 - d / 0.12);
-        ctx.beginPath(); ctx.moveTo(pts[i].x, pts[i].y); ctx.lineTo(pts[j].x, pts[j].y); ctx.stroke();
-      }
+  // two passes (back faint, front bright) instead of one stroke per line
+  for (const front of [false, true]) {
+    ctx.globalAlpha = front ? 0.35 : 0.12;
+    ctx.beginPath();
+    for (const [i, j] of pairs) {
+      if ((pts[i].z + pts[j].z < 0) !== front) continue;
+      ctx.moveTo(pts[i].x, pts[i].y); ctx.lineTo(pts[j].x, pts[j].y);
     }
+    ctx.stroke();
   }
   for (const p of pts) {
     ctx.globalAlpha = Math.max(0.15, 0.9 - p.z * 0.5);
@@ -286,52 +495,200 @@ function render() {
     ctx.beginPath(); ctx.arc(p.x, p.y, 2.2 * p.s, 0, Math.PI * 2); ctx.fill();
   }
   ctx.globalAlpha = 1;
+}
 
-  // Lightning arcs from the core
-  if (Math.random() < cfg.arcs * rate * 0.5) {
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 1.6;
-    ctx.beginPath();
-    ctx.moveTo(cx, cy);
-    const ang = Math.random() * Math.PI * 2;
-    const r = (70 + Math.random() * 65) * cfg.size;
-    for (let s = 1; s <= 4; s++) {
-      const n = s / 4;
-      ctx.lineTo(cx + Math.cos(ang) * r * n + (Math.random() - 0.5) * 18, cy + Math.sin(ang) * r * n + (Math.random() - 0.5) * 18);
+const ORBITS = [{ a: 0, sp: 1.0 }, { a: Math.PI / 3, sp: -1.3 }, { a: -Math.PI / 3, sp: 1.6 }];
+function drawOrbits(t, cx, cy, R) {
+  const rx = R * 1.08, ry = rx * 0.32;
+  for (const o of ORBITS) {
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(o.a + phase * 0.05);
+    ctx.strokeStyle = t.p; ctx.globalAlpha = 0.35; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2); ctx.stroke();
+    const ang = phase * o.sp * 2;
+    ctx.fillStyle = t.a;
+    for (let j = 0; j < 8; j++) {
+      const aa = ang - j * 0.09 * Math.sign(o.sp);
+      ctx.globalAlpha = 1 - j / 8;
+      ctx.beginPath(); ctx.arc(rx * Math.cos(aa), ry * Math.sin(aa), Math.max(0.6, 4.5 - j * 0.5), 0, Math.PI * 2); ctx.fill();
     }
-    ctx.stroke();
+    ctx.restore();
   }
+  ctx.globalAlpha = 1;
+}
 
-  // Pulsing core
-  const pulseR = (26 + Math.sin(phase * 3) * 5) * cfg.size;
+const RINGS = [
+  { f: 0.55, dir: 0.4,  w: 2.5, dash: r => [r * 0.25, r * 0.08] },
+  { f: 0.72, dir: -0.6, w: 2,   dash: () => [4, 10] },
+  { f: 0.9,  dir: 0.7,  w: 1.6, dash: r => [r * 0.6, r * 0.15, r * 0.05, r * 0.15] },
+  { f: 1.08, dir: -0.3, w: 1,   dash: () => [] }
+];
+function drawRings(t, cx, cy, R) {
+  ctx.save();
+  ctx.translate(cx, cy);
+  RINGS.forEach((g, i) => {
+    ctx.save();
+    ctx.rotate(phase * g.dir * (1 + level));
+    ctx.strokeStyle = i % 2 ? t.a : t.p;
+    ctx.globalAlpha = 0.6;
+    ctx.lineWidth = g.w;
+    ctx.setLineDash(g.dash(R * g.f));
+    ctx.beginPath(); ctx.arc(0, 0, R * g.f, 0, Math.PI * 2); ctx.stroke();
+    ctx.restore();
+  });
+  // tick marks on the outside
+  ctx.rotate(-phase * 0.2);
+  ctx.strokeStyle = t.p; ctx.globalAlpha = 0.5; ctx.lineWidth = 1;
+  ctx.beginPath();
+  const r = R * 1.18;
+  for (let i = 0; i < 72; i++) {
+    const a = i / 72 * Math.PI * 2, len = i % 6 === 0 ? 12 : 4;
+    ctx.moveTo(Math.cos(a) * r, Math.sin(a) * r);
+    ctx.lineTo(Math.cos(a) * (r + len), Math.sin(a) * (r + len));
+  }
+  ctx.stroke();
+  ctx.restore();
+  ctx.globalAlpha = 1;
+}
+
+function drawWave(t, cx, cy, R) {
+  const base = R * 0.5, n = 96;
+  const amp = R * (0.03 + level * 0.2);
+  [[t.p, 1, 2], [t.a, -1.3, 1.2]].forEach(([col, dir, lw]) => {
+    ctx.beginPath();
+    for (let i = 0; i <= n; i++) {
+      const a = i / n * Math.PI * 2;
+      const r = base + amp * (Math.sin(a * 6 + phase * 4 * dir) * 0.5 + Math.sin(a * 11 - phase * 6 * dir) * 0.3 + Math.sin(a * 3 + phase * 2) * 0.2);
+      const x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r;
+      if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y);
+    }
+    ctx.strokeStyle = col; ctx.lineWidth = lw; ctx.globalAlpha = 0.8;
+    ctx.stroke();
+  });
+  ctx.globalAlpha = 1;
+}
+
+function drawArcs(t, k, cx, cy) {
+  if (Math.random() >= cfg.arcs * k * 0.5 * (1 + level * 2)) return;
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  const ang = Math.random() * Math.PI * 2;
+  const r = (70 + Math.random() * 65) * cfg.size;
+  for (let s = 1; s <= 4; s++) {
+    const n = s / 4;
+    ctx.lineTo(cx + Math.cos(ang) * r * n + (Math.random() - 0.5) * 18, cy + Math.sin(ang) * r * n + (Math.random() - 0.5) * 18);
+  }
+  ctx.stroke();
+}
+
+function drawCore(t, cx, cy) {
+  const pulseR = (26 + Math.sin(phase * 3) * 5 + level * 14) * cfg.size;
   const core = ctx.createRadialGradient(cx, cy, 2, cx, cy, pulseR * 2.4);
   core.addColorStop(0, '#ffffff');
   core.addColorStop(0.35, t.p);
   core.addColorStop(0.75, t.a + '66');
-  core.addColorStop(1, 'transparent');
+  core.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = core;
   ctx.beginPath(); ctx.arc(cx, cy, pulseR * 2.4, 0, Math.PI * 2); ctx.fill();
-
   ctx.fillStyle = '#060913';
   ctx.font = 'bold ' + Math.round(14 * cfg.size) + 'px sans-serif';
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillText(cfg.ai === 'claude' ? '✳' : '✦', cx, cy);
-
-  // Shockwave ring
-  if (empWave > 0) {
-    ctx.strokeStyle = t.p;
-    ctx.lineWidth = 3 * (1 - empWave);
-    ctx.beginPath(); ctx.arc(cx, cy, empWave * 220 * cfg.size, 0, Math.PI * 2); ctx.stroke();
-    empWave += 0.035;
-    if (empWave >= 1) empWave = 0;
-  }
-
-  requestAnimationFrame(render);
 }
+
+function drawEmp(t, cx, cy, k) {
+  if (empWave <= 0) return;
+  ctx.strokeStyle = t.p;
+  ctx.lineWidth = 3 * (1 - empWave);
+  ctx.beginPath(); ctx.arc(cx, cy, empWave * 220 * cfg.size, 0, Math.PI * 2); ctx.stroke();
+  empWave += 0.035 * k;
+  if (empWave >= 1) empWave = 0;
+}
+
+function drawScan() {
+  if (!scanPat) {
+    const c = document.createElement('canvas');
+    c.width = 1; c.height = 4;
+    const x = c.getContext('2d');
+    x.fillStyle = 'rgba(0,0,0,0.28)'; x.fillRect(0, 0, 1, 1);
+    scanPat = ctx.createPattern(c, 'repeat');
+  }
+  ctx.fillStyle = scanPat;
+  ctx.fillRect(0, 0, W, H);
+  const y = (phase * 90) % (H + 240) - 120;
+  const g = ctx.createLinearGradient(0, y - 60, 0, y + 60);
+  g.addColorStop(0, 'rgba(255,255,255,0)');
+  g.addColorStop(0.5, th().p + '1f');
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, y - 60, W, 120);
+}
+
+function render(dt) {
+  const t = th();
+  const st = curState();
+  const k = dt * cfg.speed * STATES[st].rate;
+  phase += 0.016 * k;
+  if (!drag) rotY += 0.004 * k;
+
+  // voice energy: from the mic while listening, simulated while speaking
+  if (st === 'speaking') targetLevel = Math.max(targetLevel, 0.25 + Math.random() * 0.6);
+  level += (targetLevel - level) * 0.25;
+  targetLevel *= 0.9;
+
+  ctx.fillStyle = '#060913';
+  ctx.fillRect(0, 0, W, H);
+  const cx = W / 2, cy = H / 2;
+  const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(W, H) * 0.7);
+  glow.addColorStop(0, t.a + '33');
+  glow.addColorStop(1, 'rgba(6,9,19,0)');
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, W, H);
+
+  const R = Math.min(W, H) * 0.32 * cfg.size;
+  const L = cfg.layers;
+  if (L.grid) drawGrid(t, k);
+  if (L.warp) drawWarp(t, k, cx, cy);
+  drawParticles(t, k);
+  if (L.rings) drawRings(t, cx, cy, R);
+  if (L.sphere) drawSphere(t, cx, cy, R);
+  if (L.orbits) drawOrbits(t, cx, cy, R);
+  if (L.wave) drawWave(t, cx, cy, R);
+  drawArcs(t, k, cx, cy);
+  drawCore(t, cx, cy);
+  drawEmp(t, cx, cy, k);
+  if (L.scan) drawScan();
+}
+
+// Frame loop with an fps cap (lower on the wallpaper to save battery) and a pause switch
+let paused = false, running = false, lastTs = 0;
+function frame(ts) {
+  if (paused) { running = false; return; }
+  requestAnimationFrame(frame);
+  const fps = isWall ? Q().fps : 60;
+  if (lastTs && ts - lastTs < 1000 / fps - 3) return;
+  const dt = lastTs ? Math.min(4, (ts - lastTs) / 16.67) : 1;
+  lastTs = ts;
+  render(dt);
+}
+function startLoop() {
+  if (running) return;
+  running = true; lastTs = 0;
+  requestAnimationFrame(frame);
+}
+window.setPaused = function (b) {
+  paused = !!b;
+  if (!paused) { startLoop(); tickClock(); }
+};
+document.addEventListener('visibilitychange', () => window.setPaused(document.hidden));
 
 function pulse() { empWave = 0.01; }
 
-// Drag to spin the sphere, tap to pulse
+// Drag to spin, tap to pulse, double-tap the wallpaper to talk
+let lastTap = 0;
 canvas.addEventListener('pointerdown', e => { drag = { x: e.clientX, y: e.clientY, moved: false }; });
 window.addEventListener('pointermove', e => {
   if (!drag) return;
@@ -341,17 +698,25 @@ window.addEventListener('pointermove', e => {
   rotX = Math.max(-1.2, Math.min(1.2, rotX + dy * 0.008));
   drag.x = e.clientX; drag.y = e.clientY;
 });
-window.addEventListener('pointerup', () => { if (drag && !drag.moved) pulse(); drag = null; });
+window.addEventListener('pointerup', () => {
+  if (drag && !drag.moved) {
+    pulse();
+    const now = Date.now();
+    if (isWall && cfg.voice.wallTap && now - lastTap < 350 && hasNative('openAssistant')) {
+      Android.openAssistant();
+      lastTap = 0;
+    } else lastTap = now;
+  }
+  drag = null;
+});
 
-// ---- Studio UI ----
-// ---- Clock ----
+// ===== Clock =====
 function clockColor() { return cfg.clock.color === 'theme' ? th().p : cfg.clock.color; }
 
 function tickClock() {
   const k = cfg.clock;
-  const el = $('clock');
-  el.style.display = k.on ? '' : 'none';
-  if (!k.on) return;
+  $('clock').style.display = k.on ? '' : 'none';
+  if (!k.on || paused) return;
   const d = new Date();
   let h = d.getHours();
   let ampm = '';
@@ -377,31 +742,113 @@ function setClock(k, v) {
   cfg.clock[k] = v;
   // Changing a look setting by hand turns the preset into a custom style
   if (['font', 'glow', 'size', 'secs', 'date'].includes(k)) cfg.clock.style = 'custom';
-  saveCfg();
-  updateUI();
+  saveCfg(); updateUI();
 }
 
 function applyClockStyle(name) {
   const p = CLOCK_STYLES[name];
   Object.keys(p).forEach(key => { if (key !== 'label') cfg.clock[key] = p[key]; });
   cfg.clock.style = name;
-  saveCfg();
-  updateUI();
+  saveCfg(); updateUI();
 }
 
-function buildClockUI() {
-  const box = $('clockStyles');
-  Object.keys(CLOCK_STYLES).concat('custom').forEach(k => {
-    const b = document.createElement('button');
-    b.className = 'opt-btn';
-    b.dataset.clkStyle = k;
-    b.textContent = k === 'custom' ? 'Custom' : CLOCK_STYLES[k].label;
-    if (k !== 'custom') b.onclick = () => applyClockStyle(k);
-    else b.style.opacity = '0.6';
-    box.appendChild(b);
+// ===== Settings =====
+function set(k, v) {
+  cfg[k] = v;
+  if (k === 'particles') buildParticles();
+  if (k === 'quality') { buildNodes(); buildStars(); }
+  saveCfg(); updateUI();
+}
+
+function setScene(name) {
+  cfg.scene = name;
+  cfg.layers = Object.assign({}, SCENES[name].layers);
+  saveCfg(); updateUI();
+}
+
+function toggleLayer(name) {
+  cfg.layers[name] = cfg.layers[name] ? 0 : 1;
+  cfg.scene = 'custom';
+  saveCfg(); updateUI();
+}
+
+function updateUI() {
+  const t = th();
+  document.documentElement.style.setProperty('--p', t.p);
+  const st = STATES[curState()];
+  $('stateLabel').textContent = (cfg.voice.handsFree && !isWall && !live ? 'HANDS-FREE · ' : '') + st.label;
+  $('stateDot').style.background = st.dot;
+  $('stateDot').style.boxShadow = '0 0 8px ' + st.dot;
+  $('aiIcon').textContent = cfg.ai === 'claude' ? '✳' : '✦';
+  $('aiLabel').textContent = cfg.ai === 'claude' ? 'CLAUDE' : 'GEMINI';
+  styleClock();
+  if (isWall) return;
+
+  const act = (sel, fn) => document.querySelectorAll(sel).forEach(b => b.classList.toggle('act', fn(b)));
+  act('.swatch', s => s.dataset.theme === cfg.theme);
+  act('[data-ai]', b => b.dataset.ai === cfg.ai);
+  act('[data-state]', b => b.dataset.state === cfg.state);
+  act('[data-scene]', b => b.dataset.scene === cfg.scene);
+  act('[data-layer]', b => !!cfg.layers[b.dataset.layer]);
+  act('[data-quality]', b => b.dataset.quality === cfg.quality);
+  act('[data-vt]', b => !!cfg.voice[b.dataset.vt]);
+  [['Speed', 'speed', 'x'], ['Particles', 'particles', ''], ['Arcs', 'arcs', ''], ['Size', 'size', 'x']].forEach(([id, k, u]) => {
+    $('rng' + id).value = cfg[k];
+    $('val' + id).textContent = cfg[k] + u;
+  });
+  $('rngVoiceRate').value = cfg.voice.rate;
+  $('valVoiceRate').textContent = cfg.voice.rate + 'x';
+  $('qTalkBtn').classList.toggle('live', curState() === 'listening');
+
+  const k = cfg.clock;
+  act('[data-clk]', b => String(k[b.dataset.clk]) === b.dataset.val);
+  act('[data-clk-toggle]', b => !!k[b.dataset.clkToggle]);
+  act('[data-clk-style]', b => b.dataset.clkStyle === k.style);
+  act('.cswatch', s => s.dataset.color === k.color);
+  if (k.color !== 'theme') $('clockColor').value = k.color;
+  $('rngClockSize').value = k.size;
+  $('valClockSize').textContent = k.size + 'x';
+  renderHotkeys();
+}
+
+function makeBtn(parent, text, data, onclick) {
+  const b = document.createElement('button');
+  b.className = 'opt-btn';
+  b.textContent = text;
+  Object.assign(b.dataset, data);
+  b.onclick = onclick;
+  parent.appendChild(b);
+  return b;
+}
+
+function buildUI() {
+  Object.keys(THEMES).forEach(k => {
+    const d = document.createElement('div');
+    d.className = 'swatch';
+    d.dataset.theme = k;
+    d.style.background = 'linear-gradient(135deg,' + THEMES[k].p + ',' + THEMES[k].a + ')';
+    d.onclick = () => set('theme', k);
+    $('swatches').appendChild(d);
+  });
+  SCENE_KEYS.forEach(k => makeBtn($('sceneBtns'), SCENES[k].label, { scene: k }, () => setScene(k)));
+  makeBtn($('sceneBtns'), 'Custom', { scene: 'custom' }, null).style.opacity = '0.6';
+  Object.keys(LAYERS).forEach(k => makeBtn($('layerBtns'), LAYERS[k], { layer: k }, () => toggleLayer(k)));
+  STATE_KEYS.forEach(k => makeBtn($('stateBtns'), STATES[k].label, { state: k }, () => set('state', k)));
+  document.querySelectorAll('[data-ai]').forEach(b => b.onclick = () => set('ai', b.dataset.ai));
+  document.querySelectorAll('[data-quality]').forEach(b => b.onclick = () => set('quality', b.dataset.quality));
+  [['Speed', 'speed'], ['Particles', 'particles'], ['Arcs', 'arcs'], ['Size', 'size']].forEach(([id, k]) => {
+    $('rng' + id).oninput = e => set(k, parseFloat(e.target.value));
   });
 
-  const row = $('clockColors');
+  // Tabs
+  document.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => {
+    document.querySelectorAll('[data-tab]').forEach(x => x.classList.toggle('act', x === b));
+    document.querySelectorAll('.tab').forEach(x => x.classList.toggle('act', x.id === 'tab-' + b.dataset.tab));
+  });
+
+  // Clock controls
+  Object.keys(CLOCK_STYLES).forEach(k => makeBtn($('clockStyles'), CLOCK_STYLES[k].label, { clkStyle: k }, () => applyClockStyle(k)));
+  makeBtn($('clockStyles'), 'Custom', { clkStyle: 'custom' }, null).style.opacity = '0.6';
   const picker = $('clockColor');
   CLOCK_COLORS.forEach(c => {
     const s = document.createElement('div');
@@ -410,109 +857,410 @@ function buildClockUI() {
     if (c === 'theme') { s.textContent = 'T'; s.style.background = 'var(--p)'; }
     else s.style.background = c;
     s.onclick = () => setClock('color', c);
-    row.insertBefore(s, picker);
+    $('clockColors').insertBefore(s, picker);
   });
   picker.oninput = e => setClock('color', e.target.value);
-
-  document.querySelectorAll('[data-clk]').forEach(b => {
-    b.onclick = () => {
-      let v = b.dataset.val;
-      if (v === 'true') v = true; else if (v === 'false') v = false;
-      setClock(b.dataset.clk, v);
-    };
+  document.querySelectorAll('[data-clk]').forEach(b => b.onclick = () => {
+    let v = b.dataset.val;
+    if (v === 'true') v = true; else if (v === 'false') v = false;
+    setClock(b.dataset.clk, v);
   });
   document.querySelectorAll('[data-clk-toggle]').forEach(b => {
     b.onclick = () => setClock(b.dataset.clkToggle, !cfg.clock[b.dataset.clkToggle]);
   });
   $('rngClockSize').oninput = e => setClock('size', parseFloat(e.target.value));
-}
 
-function updateClockUI() {
-  const k = cfg.clock;
-  document.querySelectorAll('[data-clk]').forEach(b => b.classList.toggle('act', String(k[b.dataset.clk]) === b.dataset.val));
-  document.querySelectorAll('[data-clk-toggle]').forEach(b => b.classList.toggle('act', !!k[b.dataset.clkToggle]));
-  document.querySelectorAll('[data-clk-style]').forEach(b => b.classList.toggle('act', b.dataset.clkStyle === k.style));
-  document.querySelectorAll('.cswatch').forEach(s => s.classList.toggle('act', s.dataset.color === k.color));
-  if (k.color !== 'theme') $('clockColor').value = k.color;
-  $('rngClockSize').value = k.size;
-  $('valClockSize').textContent = k.size + 'x';
-}
-
-function updateUI() {
-  const t = th();
-  document.documentElement.style.setProperty('--p', t.p);
-  const st = STATES[cfg.state];
-  $('stateLabel').textContent = st.label;
-  $('stateDot').style.background = st.dot;
-  $('stateDot').style.boxShadow = '0 0 8px ' + st.dot;
-  $('aiIcon').textContent = cfg.ai === 'claude' ? '✳' : '✦';
-  $('aiLabel').textContent = cfg.ai === 'claude' ? 'CLAUDE' : 'GEMINI';
-  styleClock();
-  updateClockUI();
-  document.querySelectorAll('.swatch').forEach(s => s.classList.toggle('act', s.dataset.theme === cfg.theme));
-  document.querySelectorAll('[data-ai]').forEach(b => b.classList.toggle('act', b.dataset.ai === cfg.ai));
-  document.querySelectorAll('[data-state]').forEach(b => b.classList.toggle('act', b.dataset.state === cfg.state));
-  [['Speed', 'speed', 'x'], ['Particles', 'particles', ''], ['Arcs', 'arcs', ''], ['Size', 'size', 'x']].forEach(([id, k, u]) => {
-    $('rng' + id).value = cfg[k];
-    $('val' + id).textContent = cfg[k] + u;
+  // AI settings
+  $('inpGeminiKey').value = keys.gemini;
+  $('inpGeminiModel').value = keys.geminiModel;
+  $('inpClaudeKey').value = keys.claude;
+  $('selClaudeModel').value = keys.claudeModel;
+  $('inpPersona').value = keys.persona;
+  [['inpGeminiKey', 'gemini'], ['inpGeminiModel', 'geminiModel'], ['inpClaudeKey', 'claude'], ['selClaudeModel', 'claudeModel'], ['inpPersona', 'persona']].forEach(([id, k]) => {
+    $(id).onchange = $(id).oninput = e => { keys[k] = e.target.value.trim() ? e.target.value.trim() : KEY_DEFAULTS[k]; saveKeys(); };
   });
-}
+  $('btnTestAi').onclick = () => askAI('Say a one-sentence hello and confirm you are online.', true);
+  $('btnClearChat').onclick = () => { history = []; showCaption('', 'Chat memory cleared.'); };
 
-function set(k, v) {
-  cfg[k] = v;
-  if (k === 'particles') buildParticles();
-  saveCfg();
-  updateUI();
-}
+  // Voice settings
+  document.querySelectorAll('[data-vt]').forEach(b => b.onclick = () => {
+    const k = b.dataset.vt;
+    cfg.voice[k] = !cfg.voice[k];
+    saveCfg(); updateUI();
+    if (k === 'handsFree') { if (cfg.voice.handsFree) startListen('wake'); else stopListen(); }
+  });
+  $('rngVoiceRate').oninput = e => { cfg.voice.rate = parseFloat(e.target.value); saveCfg(); updateUI(); };
+  $('inpWake').value = cfg.voice.wake;
+  $('inpWake').oninput = e => { cfg.voice.wake = e.target.value; saveCfg(); };
+  $('btnAddCmd').onclick = () => { cfg.commands.push({ p: '', a: 'pulse', v: '', hk: false }); saveCfg(); renderCommands(); };
+  renderCommands();
 
-function buildUI() {
-  const sw = $('swatches');
-  Object.keys(THEMES).forEach(k => {
-    const d = document.createElement('div');
-    d.className = 'swatch';
-    d.dataset.theme = k;
-    d.style.background = 'linear-gradient(135deg,' + THEMES[k].p + ',' + THEMES[k].a + ')';
-    d.onclick = () => set('theme', k);
-    sw.appendChild(d);
-  });
-  const sb = $('stateBtns');
-  STATE_KEYS.forEach(k => {
-    const b = document.createElement('button');
-    b.className = 'opt-btn';
-    b.dataset.state = k;
-    b.textContent = STATES[k].label;
-    b.onclick = () => set('state', k);
-    sb.appendChild(b);
-  });
-  document.querySelectorAll('[data-ai]').forEach(b => b.onclick = () => set('ai', b.dataset.ai));
-  [['Speed', 'speed'], ['Particles', 'particles'], ['Arcs', 'arcs'], ['Size', 'size']].forEach(([id, k]) => {
-    $('rng' + id).oninput = e => set(k, parseFloat(e.target.value));
-  });
-
-  $('qStateBtn').onclick = () => set('state', STATE_KEYS[(STATE_KEYS.indexOf(cfg.state) + 1) % STATE_KEYS.length]);
+  // Dock
+  $('qTalkBtn').onclick = () => { if (listening && listenMode === 'direct') stopListen(); else { stopListen(); startListen('direct'); } };
+  $('qAskBtn').onclick = () => {
+    const open = $('askBar').classList.toggle('open');
+    $('hotkeys').style.display = open ? 'none' : '';
+    if (open) $('inpPrompt').focus();
+  };
   $('qPulseBtn').onclick = pulse;
-  $('qAiBtn').onclick = () => set('ai', cfg.ai === 'claude' ? 'gemini' : 'claude');
+  $('qSceneBtn').onclick = () => runAction('nextScene', '', true);
+  const send = () => {
+    const v = $('inpPrompt').value.trim();
+    if (!v) return;
+    $('inpPrompt').value = '';
+    $('inpPrompt').blur();
+    handleUtterance(v);
+  };
+  $('btnSendPrompt').onclick = send;
+  $('inpPrompt').onkeydown = e => { if (e.key === 'Enter') send(); };
 
   $('drawerToggle').onclick = () => {
     $('drawer').classList.toggle('open');
     $('drawerToggle').classList.toggle('open');
   };
-
-  $('applyBtn').onclick = () => {
-    saveCfg();
-    if (window.Android && Android.applyWallpaper) {
-      Android.applyWallpaper();
-    } else {
-      alert('Open this in the Nova Apex app to set the wallpaper.');
-    }
-  };
+  $('applyBtn').onclick = () => runAction('apply', '', true);
 }
 
-// Called by the wallpaper service when it becomes visible
+// ===== Commands & hotkeys =====
+const ACTIONS = {
+  pulse:       { label: 'Pulse' },
+  nextTheme:   { label: 'Next theme' },
+  theme:       { label: 'Set theme', arg: () => Object.keys(THEMES) },
+  nextScene:   { label: 'Next scene' },
+  scene:       { label: 'Set scene', arg: () => SCENE_KEYS },
+  state:       { label: 'Set state', arg: () => STATE_KEYS },
+  toggleClock: { label: 'Clock on/off' },
+  ask:         { label: 'Ask AI a set question', arg: 'text' },
+  speak:       { label: 'Say something', arg: 'text' },
+  apply:       { label: 'Set as wallpaper' }
+};
+
+// Runs an action; returns a short spoken confirmation ('' when the action answers by itself)
+function runAction(a, v, quiet) {
+  let msg = '';
+  switch (a) {
+    case 'pulse': msg = 'Pulse.'; break;
+    case 'nextTheme': {
+      const ks = Object.keys(THEMES);
+      set('theme', ks[(ks.indexOf(cfg.theme) + 1) % ks.length]);
+      msg = 'Theme ' + cfg.theme + '.'; break;
+    }
+    case 'theme': if (THEMES[v]) { set('theme', v); msg = 'Theme ' + v + '.'; } break;
+    case 'nextScene': {
+      const i = SCENE_KEYS.indexOf(cfg.scene);
+      setScene(SCENE_KEYS[(i + 1) % SCENE_KEYS.length]);
+      msg = SCENES[cfg.scene].label + ' engaged.'; break;
+    }
+    case 'scene': if (SCENES[v]) { setScene(v); msg = SCENES[v].label + ' engaged.'; } break;
+    case 'state': if (STATES[v]) { set('state', v); msg = 'State ' + v + '.'; } break;
+    case 'toggleClock': setClock('on', !cfg.clock.on); msg = 'Clock ' + (cfg.clock.on ? 'on.' : 'off.'); break;
+    case 'ask': askAI(v || 'Hello'); return '';
+    case 'speak': msg = v; break;
+    case 'apply':
+      saveCfg();
+      if (hasNative('applyWallpaper')) Android.applyWallpaper();
+      else alert('Open this in the Nova Apex app to set the wallpaper.');
+      msg = 'Opening wallpaper settings.'; break;
+  }
+  pulse();
+  if (quiet) { if (msg) showCaption('', msg); return ''; }
+  return msg;
+}
+
+function renderCommands() {
+  const box = $('cmdList');
+  box.innerHTML = '';
+  cfg.commands.forEach((c, i) => {
+    const card = document.createElement('div');
+    card.className = 'cmd';
+    const r1 = document.createElement('div'); r1.className = 'cmd-row';
+    const phrase = document.createElement('input');
+    phrase.className = 'inp'; phrase.placeholder = 'Phrase, e.g. "red alert"'; phrase.value = c.p;
+    phrase.oninput = () => { c.p = phrase.value; saveCfg(); renderHotkeys(); };
+    const hk = document.createElement('label'); hk.className = 'cmd-hk';
+    const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = !!c.hk;
+    cb.onchange = () => { c.hk = cb.checked; saveCfg(); renderHotkeys(); };
+    hk.appendChild(cb); hk.appendChild(document.createTextNode('Hotkey'));
+    const del = document.createElement('button'); del.className = 'cmd-del'; del.textContent = '✕';
+    del.onclick = () => { cfg.commands.splice(i, 1); saveCfg(); renderCommands(); renderHotkeys(); };
+    r1.append(phrase, hk, del);
+
+    const r2 = document.createElement('div'); r2.className = 'cmd-row';
+    const act = document.createElement('select'); act.className = 'inp';
+    Object.keys(ACTIONS).forEach(k => { const o = document.createElement('option'); o.value = k; o.textContent = ACTIONS[k].label; act.appendChild(o); });
+    act.value = c.a;
+    act.onchange = () => {
+      c.a = act.value; c.v = '';
+      const a = ACTIONS[c.a].arg;
+      if (typeof a === 'function') c.v = a()[0];
+      saveCfg(); renderCommands();
+    };
+    r2.appendChild(act);
+    const arg = ACTIONS[c.a] && ACTIONS[c.a].arg;
+    if (typeof arg === 'function') {
+      const s = document.createElement('select'); s.className = 'inp';
+      arg().forEach(k => { const o = document.createElement('option'); o.value = k; o.textContent = (SCENES[k] && SCENES[k].label) || k; s.appendChild(o); });
+      s.value = c.v || arg()[0];
+      s.onchange = () => { c.v = s.value; saveCfg(); };
+      r2.appendChild(s);
+    } else if (arg === 'text') {
+      const t = document.createElement('input'); t.className = 'inp';
+      t.placeholder = c.a === 'ask' ? 'Question for the AI' : 'What Nova says';
+      t.value = c.v || '';
+      t.oninput = () => { c.v = t.value; saveCfg(); };
+      r2.appendChild(t);
+    }
+    card.append(r1, r2);
+    box.appendChild(card);
+  });
+}
+
+function renderHotkeys() {
+  const bar = $('hotkeys');
+  bar.innerHTML = '';
+  if (!cfg.voice.hotkeys) return;
+  cfg.commands.filter(c => c.hk && c.p.trim()).forEach(c => {
+    const b = document.createElement('button');
+    b.className = 'hk';
+    b.textContent = c.p;
+    b.onclick = () => { const m = runAction(c.a, c.v, false); if (m) say(m, ''); };
+    bar.appendChild(b);
+  });
+}
+
+const norm = s => (s || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+
+function matchCommand(text) {
+  const n = ' ' + norm(text) + ' ';
+  let best = null;
+  for (const c of cfg.commands) {
+    const p = norm(c.p);
+    if (p && n.includes(' ' + p + ' ') && (!best || p.length > norm(best.p).length)) best = c;
+  }
+  return best;
+}
+
+// ===== Captions =====
+let capTimer = 0;
+function showCaption(you, text) {
+  $('capYou').textContent = you ? 'You: ' + you : '';
+  $('capText').textContent = text;
+  $('caption').classList.add('show');
+  clearTimeout(capTimer);
+  capTimer = setTimeout(() => $('caption').classList.remove('show'), 12000);
+}
+
+function setLive(s) { live = s; updateUI(); }
+
+// ===== Speech (native Android, with a browser fallback for testing) =====
+let listening = false, listenMode = null, listenAfterSpeech = false, browserRec = null;
+
+function startListen(m) {
+  if (isWall) return;
+  listenMode = m;
+  listening = true;
+  if (m === 'direct') setLive('listening');
+  else updateUI();
+  if (hasNative('startListening')) { Android.startListening(); return; }
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { listening = false; setLive(null); showCaption('', 'Voice input needs the Nova Apex app.'); return; }
+  browserRec = new SR();
+  browserRec.interimResults = true;
+  browserRec.onresult = e => {
+    const r = e.results[e.results.length - 1];
+    window.onVoice(r.isFinal ? 'final' : 'partial', r[0].transcript);
+  };
+  browserRec.onerror = e => window.onVoice('error', e.error === 'no-speech' ? 'no-match' : e.error);
+  browserRec.start();
+}
+window.startListen = startListen;
+
+function stopListen() {
+  listening = false; listenMode = null;
+  if (hasNative('stopListening')) Android.stopListening();
+  if (browserRec) { try { browserRec.abort(); } catch (e) {} browserRec = null; }
+  if (live === 'listening') setLive(null); else updateUI();
+}
+
+// Called from Android: type = partial | final | level | error
+window.onVoice = function (type, text) {
+  if (type === 'level') { targetLevel = Math.max(targetLevel, Math.min(1, Math.max(0, (parseFloat(text) + 2) / 12))); return; }
+  if (!listening) return;
+  if (type === 'partial') { if (listenMode === 'direct' && text) showCaption('', text + '…'); return; }
+  const m = listenMode;
+  if (type === 'final') {
+    listening = false;
+    if (m === 'wake') handleWake(text); else handleUtterance(text);
+    return;
+  }
+  if (type === 'error') {
+    listening = false;
+    if (text === 'permission') { cfg.voice.handsFree = false; saveCfg(); setLive(null); showCaption('', 'Nova needs microphone permission to listen.'); return; }
+    if (text === 'unavailable') { setLive(null); showCaption('', 'Speech recognition isn\'t available on this phone. Install or update the Google app.'); return; }
+    if (m === 'direct') { setLive(null); showCaption('', text === 'no-match' ? 'I didn\'t catch that.' : 'Voice error: ' + text); }
+    resumeHandsFree(m === 'wake' ? 400 : 800);
+  }
+};
+
+function handleWake(text) {
+  const n = norm(text), w = norm(cfg.voice.wake);
+  const i = w ? n.indexOf(w) : -1;
+  if (i < 0) { resumeHandsFree(250); return; }
+  const rest = n.slice(i + w.length).trim();
+  pulse();
+  if (rest) handleUtterance(rest);
+  else { listenAfterSpeech = true; say('Yes?', ''); }
+}
+
+function handleUtterance(text) {
+  text = (text || '').trim();
+  if (!text) { setLive(null); resumeHandsFree(500); return; }
+  const c = matchCommand(text);
+  if (c) {
+    showCaption(text, '');
+    const m = runAction(c.a, c.v, false);
+    if (m) say(m, text);
+    else if (c.a !== 'ask') done();
+    return;
+  }
+  askAI(text);
+}
+
+function say(text, you) {
+  showCaption(you, text);
+  if (!cfg.voice.speak || !text) { done(); return; }
+  setLive('speaking');
+  if (hasNative('speak')) { Android.speak(text, cfg.voice.rate); return; }
+  if (window.speechSynthesis) {
+    const u = new SpeechSynthesisUtterance(text);
+    u.rate = cfg.voice.rate;
+    u.onend = u.onerror = () => window.onTts('done');
+    speechSynthesis.cancel();
+    speechSynthesis.speak(u);
+  } else done();
+}
+
+// Called from Android when speech output finishes
+window.onTts = function (type) { if (type === 'done' && live === 'speaking') done(); };
+
+function done() {
+  setLive(null);
+  if (listenAfterSpeech) { listenAfterSpeech = false; setTimeout(() => startListen('direct'), 300); return; }
+  resumeHandsFree(600);
+}
+
+function resumeHandsFree(ms) {
+  if (!cfg.voice.handsFree || isWall) return;
+  setTimeout(() => {
+    if (cfg.voice.handsFree && !listening && !live && !document.hidden) startListen('wake');
+  }, ms);
+}
+
+// App going to the background: stop the mic
+window.onAppPause = function () {
+  stopListen();
+  if (window.speechSynthesis) speechSynthesis.cancel();
+  if (live) setLive(null);
+};
+window.onAppResume = function () { resumeHandsFree(800); };
+
+// ===== AI =====
+let history = [];
+const pendingHttp = {};
+let httpSeq = 0;
+
+function httpPost(url, headers, body) {
+  if (hasNative('httpPost')) {
+    return new Promise(resolve => {
+      const id = 'r' + (++httpSeq);
+      pendingHttp[id] = resolve;
+      Android.httpPost(id, url, JSON.stringify(headers), body);
+    });
+  }
+  return fetch(url, { method: 'POST', headers: headers, body: body })
+    .then(r => r.text().then(t => ({ status: r.status, body: t })))
+    .catch(e => ({ status: 0, body: String(e) }));
+}
+window.onHttp = function (id, status, body) {
+  const r = pendingHttp[id];
+  delete pendingHttp[id];
+  if (r) r({ status: status, body: body });
+};
+
+function errorText(provider, res) {
+  let detail = '';
+  try { const j = JSON.parse(res.body); detail = (j.error && (j.error.message || j.error.type)) || ''; } catch (e) {}
+  if (res.status === 0) return 'Can\'t reach ' + provider + '. Check your internet connection.';
+  if (res.status === 401 || res.status === 403) return provider + ' rejected the API key. Check it in Settings › AI.';
+  if (res.status === 404) return provider + ' model not found. Check the model name in Settings › AI.';
+  if (res.status === 429) return provider + ' rate limit or quota reached. Try again in a moment.';
+  return provider + ' error ' + res.status + (detail ? ': ' + detail : '');
+}
+
+function cleanReply(s) {
+  return (s || '').replace(/[*_#`>]+/g, '').replace(/\n{2,}/g, '\n').trim();
+}
+
+async function askAI(text, isTest) {
+  const provider = cfg.ai;
+  const key = provider === 'claude' ? keys.claude : keys.gemini;
+  const name = provider === 'claude' ? 'Claude' : 'Gemini';
+  const you = isTest ? '' : text;
+  if (!key) {
+    setLive(null);
+    showCaption(you, 'Add your ' + name + ' API key in Settings › AI first.');
+    resumeHandsFree(1500);
+    return;
+  }
+  showCaption(you, 'Thinking…');
+  setLive('thinking');
+  const msgs = isTest ? [{ role: 'user', text: text }] : history.concat([{ role: 'user', text: text }]).slice(-12);
+  let res, reply = '';
+  if (provider === 'claude') {
+    res = await httpPost('https://api.anthropic.com/v1/messages', {
+      'content-type': 'application/json',
+      'x-api-key': key,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true'
+    }, JSON.stringify({
+      model: keys.claudeModel,
+      max_tokens: 400,
+      system: keys.persona,
+      messages: msgs.map(m => ({ role: m.role, content: m.text }))
+    }));
+    if (res.status === 200) {
+      try { reply = JSON.parse(res.body).content.filter(b => b.type === 'text').map(b => b.text).join(' '); } catch (e) {}
+    }
+  } else {
+    res = await httpPost('https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(keys.geminiModel) + ':generateContent', {
+      'content-type': 'application/json',
+      'x-goog-api-key': key
+    }, JSON.stringify({
+      systemInstruction: { parts: [{ text: keys.persona }] },
+      contents: msgs.map(m => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.text }] })),
+      generationConfig: { maxOutputTokens: 400 }
+    }));
+    if (res.status === 200) {
+      try { reply = JSON.parse(res.body).candidates[0].content.parts.map(p => p.text || '').join(' '); } catch (e) {}
+    }
+  }
+  if (res.status !== 200 || !reply) {
+    setLive(null);
+    showCaption(you, res.status === 200 ? name + ' sent an empty reply.' : errorText(name, res));
+    resumeHandsFree(2000);
+    return;
+  }
+  reply = cleanReply(reply);
+  if (!isTest) history = msgs.concat([{ role: 'assistant', text: reply }]).slice(-12);
+  say(reply, you);
+}
+
+// ===== Sync with the wallpaper =====
 window.syncConfig = function () {
-  const old = cfg.particles;
+  const old = cfg;
   cfg = loadCfg();
-  if (cfg.particles !== old) buildParticles();
+  if (cfg.particles !== old.particles) buildParticles();
+  if (cfg.quality !== old.quality) { resize(); buildNodes(); buildStars(); }
   updateUI();
 };
 
@@ -520,11 +1268,15 @@ window.addEventListener('resize', () => { resize(); buildParticles(); });
 resize();
 buildNodes();
 buildParticles();
-buildUI();
-buildClockUI();
+buildStars();
+if (!isWall) buildUI();
 updateUI();
 setInterval(tickClock, 1000);
-render();
+startLoop();
+if (!isWall) {
+  if (params.get('listen') === '1') setTimeout(() => startListen('direct'), 700);
+  else resumeHandsFree(1000);
+}
 </script>
 </body>
 </html>
