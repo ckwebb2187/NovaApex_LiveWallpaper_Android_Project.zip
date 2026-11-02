@@ -7,6 +7,7 @@ jobs:
     env:
       ANDROID_HOME: /usr/local/lib/android/sdk
       ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+
     steps:
       - uses: actions/checkout@v4
 
@@ -16,49 +17,56 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Build APK with Gradle 8.5
+      - name: Generate Android Project Files
         run: |
-          set -e
+          mkdir -p app/src/main/java/com/nova/apex/wallpaper app/src/main/res/xml app/src/main/assets
 
-          # 1. Unzip project if uploaded as zip
-          for z in *.zip; do
-            if [ -f "$z" ]; then
-              echo "Extracting: $z"
-              unzip -q -o "$z"
-            fi
-          done
+          cat << 'EOF' > settings.gradle
+          rootProject.name = "NovaApexLiveWallpaper"
+          include ':app'
+          EOF
 
-          # 2. Find settings.gradle
-          SETTINGS=$(find . -name "settings.gradle" | head -n 1)
-          if [ -z "$SETTINGS" ]; then
-            echo "ERROR: settings.gradle not found!"
-            ls -la
-            exit 1
-          fi
+          cat << 'EOF' > build.gradle
+          plugins {
+              id 'com.android.application' version '8.2.2' apply false
+          }
+          EOF
 
-          BUILD_DIR=$(dirname "$SETTINGS")
-          echo "Building inside directory: $BUILD_DIR"
-          cd "$BUILD_DIR"
+          cat << 'EOF' > app/build.gradle
+          plugins {
+              id 'com.android.application'
+          }
+          android {
+              namespace 'com.nova.apex.wallpaper'
+              compileSdk 34
+              defaultConfig {
+                  applicationId "com.nova.apex.wallpaper"
+                  minSdk 24
+                  targetSdk 34
+                  versionCode 1
+                  versionName "1.0.0"
+              }
+              compileOptions {
+                  sourceCompatibility JavaVersion.VERSION_17
+                  targetCompatibility JavaVersion.VERSION_17
+              }
+          }
+          EOF
 
-          # 3. Write SDK path for Gradle
-          echo "sdk.dir=/usr/local/lib/android/sdk" > local.properties
-
-          # 4. Accept licenses
-          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses 2>/dev/null || true
-
-          # 5. Download and run Gradle 8.5
-          if [ ! -d "/tmp/gradle-8.5" ]; then
-            echo "Downloading Gradle 8.5..."
-            curl -sLo /tmp/gradle.zip https://services.gradle.org/distributions/gradle-8.5-bin.zip
-            unzip -q -o /tmp/gradle.zip -d /tmp
-          fi
-
-          echo "Compiling Android Live Wallpaper APK..."
-          /tmp/gradle-8.5/bin/gradle assembleDebug --no-daemon
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: NovaApex-LiveWallpaper-APK
-          path: "**/app/build/outputs/apk/debug/*.apk"
-          
+          cat << 'EOF' > app/src/main/AndroidManifest.xml
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+              package="com.nova.apex.wallpaper">
+              <uses-feature android:name="android.software.live_wallpaper" android:required="true" />
+              <uses-permission android:name="android.permission.RECORD_AUDIO" />
+              <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+              <application
+                  android:allowBackup="true"
+                  android:label="Nova Apex AI"
+                  android:supportsRtl="true">
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true">
+                      <intent-filter>
+                          <action android:name="
+                          
