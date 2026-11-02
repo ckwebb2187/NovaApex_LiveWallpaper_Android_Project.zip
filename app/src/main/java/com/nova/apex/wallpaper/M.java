@@ -2,7 +2,14 @@ package com.nova.apex.wallpaper;
 
 import android.Manifest;
 import android.app.Activity;
+import android.app.PendingIntent;
 import android.app.WallpaperManager;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.IntentFilter;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageInstaller;
+import android.os.Build;
 import android.content.ComponentName;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -22,6 +29,9 @@ import android.widget.Toast;
 import org.json.JSONObject;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
@@ -32,6 +42,7 @@ import java.util.Iterator;
 
 public class M extends Activity {
     static final String ACTION_TALK = "com.nova.apex.wallpaper.TALK";
+    private static final String ACTION_INSTALLED = "com.nova.apex.wallpaper.INSTALL_RESULT";
     private static final int REQ_MIC = 7;
 
     private WebView v;
@@ -58,6 +69,10 @@ public class M extends Activity {
         if (isTalk(getIntent())) url += "&listen=1";
         v.loadUrl(url);
         setContentView(v);
+
+        IntentFilter f = new IntentFilter(ACTION_INSTALLED);
+        if (Build.VERSION.SDK_INT >= 33) registerReceiver(installReceiver, f, Context.RECEIVER_NOT_EXPORTED);
+        else registerReceiver(installReceiver, f);
 
         tts = new TextToSpeech(this, status -> {
             ttsReady = status == TextToSpeech.SUCCESS;
@@ -178,25 +193,27 @@ public class M extends Activity {
     };
 
     // ---- Network (done here so the page has no cross-site limits) ----
-    private void post(String id, String url, String headers, String body) {
+    private void request(String id, String method, String url, String headers, String body) {
         new Thread(() -> {
             int status = 0;
             String out;
             HttpURLConnection c = null;
             try {
                 c = (HttpURLConnection) new URL(url).openConnection();
-                c.setRequestMethod("POST");
+                c.setRequestMethod(method);
                 c.setConnectTimeout(15000);
                 c.setReadTimeout(60000);
-                c.setDoOutput(true);
                 JSONObject h = new JSONObject(headers);
                 Iterator<String> it = h.keys();
                 while (it.hasNext()) {
                     String k = it.next();
                     c.setRequestProperty(k, h.getString(k));
                 }
-                try (OutputStream os = c.getOutputStream()) {
-                    os.write(body.getBytes(StandardCharsets.UTF_8));
+                if (body != null) {
+                    c.setDoOutput(true);
+                    try (OutputStream os = c.getOutputStream()) {
+                        os.write(body.getBytes(StandardCharsets.UTF_8));
+                    }
                 }
                 status = c.getResponseCode();
                 InputStream in = status >= 400 ? c.getErrorStream() : c.getInputStream();
@@ -218,6 +235,87 @@ public class M extends Activity {
         in.close();
         return new String(bo.toByteArray(), StandardCharsets.UTF_8);
     }
+
+    // ---- In-app updates ----
+    private void updateEvent(String type, String text) {
+        js("window.onUpdate&&onUpdate(" + JSONObject.quote(type) + "," + JSONObject.quote(text) + ")");
+    }
+
+    private void downloadAndInstall(String url) {
+        new Thread(() -> {
+            File apk = new File(getCacheDir(), "update.apk");
+            try {
+                // Download (GitHub redirects release files to its storage)
+                HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
+                c.setInstanceFollowRedirects(true);
+                c.setConnectTimeout(15000);
+                c.setReadTimeout(60000);
+                int status = c.getResponseCode();
+                if (status >= 400) throw new Exception("Download failed (" + status + ")");
+                long total = c.getContentLengthLong();
+                long got = 0;
+                int lastPct = -1;
+                try (InputStream in = c.getInputStream(); OutputStream out = new FileOutputStream(apk)) {
+                    byte[] buf = new byte[16384];
+                    int n;
+                    while ((n = in.read(buf)) > 0) {
+                        out.write(buf, 0, n);
+                        got += n;
+                        int pct = total > 0 ? (int) (got * 100 / total) : -1;
+                        if (pct != lastPct) {
+                            lastPct = pct;
+                            updateEvent("progress", String.valueOf(pct));
+                        }
+                    }
+                }
+                c.disconnect();
+
+                // Hand the file to Android's installer; it asks the user to confirm
+                PackageInstaller pi = getPackageManager().getPackageInstaller();
+                PackageInstaller.SessionParams params = new PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL);
+                int sid = pi.createSession(params);
+                try (PackageInstaller.Session session = pi.openSession(sid)) {
+                    try (InputStream in = new FileInputStream(apk); OutputStream out = session.openWrite("nova", 0, apk.length())) {
+                        byte[] buf = new byte[65536];
+                        int n;
+                        while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+                        session.fsync(out);
+                    }
+                    Intent done = new Intent(ACTION_INSTALLED).setPackage(getPackageName());
+                    int flags = PendingIntent.FLAG_UPDATE_CURRENT | (Build.VERSION.SDK_INT >= 31 ? PendingIntent.FLAG_MUTABLE : 0);
+                    PendingIntent pend = PendingIntent.getBroadcast(this, sid, done, flags);
+                    session.commit(pend.getIntentSender());
+                }
+                updateEvent("installing", "");
+            } catch (Exception e) {
+                updateEvent("error", String.valueOf(e.getMessage()));
+            }
+        }).start();
+    }
+
+    private final BroadcastReceiver installReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context ctx, Intent i) {
+            int status = i.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE);
+            if (status == PackageInstaller.STATUS_PENDING_USER_ACTION) {
+                Intent confirm = i.getParcelableExtra(Intent.EXTRA_INTENT);
+                if (confirm != null) {
+                    confirm.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    startActivity(confirm);
+                }
+            } else if (status == PackageInstaller.STATUS_SUCCESS) {
+                updateEvent("done", "");
+            } else {
+                String msg = i.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE);
+                if (status == PackageInstaller.STATUS_FAILURE_CONFLICT || status == PackageInstaller.STATUS_FAILURE_INCOMPATIBLE) {
+                    msg = "This update was signed differently from the installed app. Uninstall Nova Apex once, then install the new APK by hand.";
+                } else if (status == PackageInstaller.STATUS_FAILURE_ABORTED) {
+                    msg = "Update cancelled.";
+                }
+                updateEvent("error", msg == null ? "Install failed" : msg);
+            }
+        }
+    };
 
     private class Bridge {
         @JavascriptInterface
@@ -269,7 +367,27 @@ public class M extends Activity {
 
         @JavascriptInterface
         public void httpPost(String id, String url, String headers, String body) {
-            post(id, url, headers, body);
+            request(id, "POST", url, headers, body);
+        }
+
+        @JavascriptInterface
+        public void httpGet(String id, String url, String headers) {
+            request(id, "GET", url, headers, null);
+        }
+
+        @JavascriptInterface
+        public String getVersion() {
+            try {
+                PackageInfo pi = getPackageManager().getPackageInfo(getPackageName(), 0);
+                return "{\"code\":" + pi.versionCode + ",\"name\":" + JSONObject.quote(pi.versionName) + "}";
+            } catch (Exception e) {
+                return "{\"code\":0,\"name\":\"?\"}";
+            }
+        }
+
+        @JavascriptInterface
+        public void installUpdate(String url) {
+            downloadAndInstall(url);
         }
     }
 
@@ -295,6 +413,7 @@ public class M extends Activity {
 
     @Override
     protected void onDestroy() {
+        try { unregisterReceiver(installReceiver); } catch (Exception ignored) { }
         if (rec != null) rec.destroy();
         if (tts != null) tts.shutdown();
         if (v != null) v.destroy();

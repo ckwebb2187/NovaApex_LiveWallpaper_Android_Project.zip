@@ -37,7 +37,7 @@ body{background:#060913;color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFo
 #drawerToggle{position:fixed;right:18px;top:84px;z-index:21;width:44px;height:44px;border-radius:50%;border:1px solid rgba(255,255,255,0.15);background:rgba(15,23,42,0.85);color:var(--p);font-size:18px;font-weight:700;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:transform .3s;}
 #drawerToggle.open{transform:rotate(90deg);}
 .tabs{display:flex;gap:6px;position:sticky;top:-14px;background:rgba(10,15,30,0.98);padding:4px 0 10px;z-index:2;}
-.tabs button{flex:1;padding:9px 0;border-radius:10px;border:1px solid rgba(255,255,255,0.08);background:rgba(30,41,59,0.5);color:#94a3b8;font-size:12px;font-weight:800;letter-spacing:0.5px;}
+.tabs button{flex:1;padding:9px 0;min-width:0;border-radius:10px;border:1px solid rgba(255,255,255,0.08);background:rgba(30,41,59,0.5);color:#94a3b8;font-size:11px;font-weight:800;letter-spacing:0.3px;}
 .tabs button.act{color:#060913;background:var(--p);border-color:var(--p);}
 .tab{display:none;}
 .tab.act{display:block;}
@@ -122,6 +122,7 @@ body.wallpaper #hotkeys,body.wallpaper #askBar,body.wallpaper #caption{display:n
     <button data-tab="clock">CLOCK</button>
     <button data-tab="ai">AI</button>
     <button data-tab="voice">VOICE</button>
+    <button data-tab="app">APP</button>
   </div>
 
   <!-- LOOK -->
@@ -252,6 +253,21 @@ body.wallpaper #hotkeys,body.wallpaper #askBar,body.wallpaper #caption{display:n
     <div class="note">Say or type a phrase to run its action. Check "Hotkey" to also get a tap button on the main screen. Anything that doesn't match a command goes to the AI.</div>
   </div>
 
+  <!-- APP -->
+  <div class="tab" id="tab-app">
+    <div class="sec-label">Updates</div>
+    <div class="field"><label>Installed version</label><div id="verText" style="font-size:14px;font-weight:700;color:var(--p)">…</div></div>
+    <div class="grid-2">
+      <button class="opt-btn" id="btnCheckUpdate">Check for updates</button>
+      <button class="opt-btn" data-vt="autoUpdate">Check on launch</button>
+    </div>
+    <div id="updateBox" style="display:none;margin-top:10px">
+      <div class="note" id="updateText" style="color:#cbd5e1;font-size:12px;white-space:pre-line"></div>
+      <button class="apply-btn" id="btnInstallUpdate" style="margin-top:10px">DOWNLOAD &amp; INSTALL</button>
+    </div>
+    <div class="note">Updates come from the newest build on GitHub. The first time, Android asks you to allow Nova Apex to install apps — say yes. Your settings and API keys stay when you update.</div>
+  </div>
+
   <button class="apply-btn" id="applyBtn">SET AS LIVE WALLPAPER</button>
 </div>
 
@@ -298,7 +314,7 @@ const CLOCK_STYLES = {
 const CLOCK_DEFAULTS = { on: true, style: 'neon', pos: 'top', h24: false, secs: false, date: true, glow: true, font: 'sans', size: 1, color: 'theme' };
 const CLOCK_COLORS = ['theme', '#ffffff', '#38bdf8', '#a78bfa', '#f472b6', '#fb923c', '#facc15', '#34d399'];
 
-const VOICE_DEFAULTS = { speak: true, handsFree: false, wallTap: true, hotkeys: true, rate: 1, wake: 'hey nova' };
+const VOICE_DEFAULTS = { autoUpdate: true, speak: true, handsFree: false, wallTap: true, hotkeys: true, rate: 1, wake: 'hey nova' };
 const DEFAULT_COMMANDS = [
   { p: 'pulse', a: 'pulse', v: '', hk: true },
   { p: 'next theme', a: 'nextTheme', v: '', hk: true },
@@ -593,10 +609,6 @@ function drawCore(t, cx, cy) {
   core.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = core;
   ctx.beginPath(); ctx.arc(cx, cy, pulseR * 2.4, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = '#060913';
-  ctx.font = 'bold ' + Math.round(14 * cfg.size) + 'px sans-serif';
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText(cfg.ai === 'claude' ? '✳' : '✦', cx, cy);
 }
 
 function drawEmp(t, cx, cy, k) {
@@ -919,6 +931,8 @@ function buildUI() {
     $('drawerToggle').classList.toggle('open');
   };
   $('applyBtn').onclick = () => runAction('apply', '', true);
+  $('btnCheckUpdate').onclick = () => checkUpdate(false);
+  $('btnInstallUpdate').onclick = installUpdate;
 }
 
 // ===== Commands & hotkeys =====
@@ -1255,6 +1269,73 @@ async function askAI(text, isTest) {
   say(reply, you);
 }
 
+// ===== In-app updates =====
+const RELEASES = 'https://api.github.com/repos/ckwebb2187/NovaApex_LiveWallpaper_Android_Project.zip/releases/latest';
+let latest = null;
+
+function myVersion() {
+  try { return hasNative('getVersion') ? JSON.parse(Android.getVersion()) : { code: 0, name: 'browser preview' }; }
+  catch (e) { return { code: 0, name: '?' }; }
+}
+
+function httpGet(url, headers) {
+  if (hasNative('httpGet')) {
+    return new Promise(resolve => {
+      const id = 'g' + (++httpSeq);
+      pendingHttp[id] = resolve;
+      Android.httpGet(id, url, JSON.stringify(headers));
+    });
+  }
+  return fetch(url, { headers: headers })
+    .then(r => r.text().then(t => ({ status: r.status, body: t })))
+    .catch(e => ({ status: 0, body: String(e) }));
+}
+
+function showUpdate(text, canInstall) {
+  $('updateBox').style.display = '';
+  $('updateText').textContent = text;
+  $('btnInstallUpdate').style.display = canInstall ? '' : 'none';
+}
+
+async function checkUpdate(silent) {
+  const v = myVersion();
+  $('verText').textContent = v.name + (v.code ? ' (build ' + v.code + ')' : '');
+  if (!silent) showUpdate('Checking…', false);
+  const res = await httpGet(RELEASES, { 'Accept': 'application/vnd.github+json', 'User-Agent': 'NovaApex' });
+  if (res.status !== 200) {
+    if (!silent) showUpdate(res.status === 404 ? 'No builds published yet.' : 'Couldn\'t check for updates (' + (res.status || 'offline') + ').', false);
+    return;
+  }
+  let rel;
+  try { rel = JSON.parse(res.body); } catch (e) { return; }
+  const code = parseInt(String(rel.tag_name || '').replace(/\D/g, ''), 10) || 0;
+  const asset = (rel.assets || []).find(a => /\.apk$/i.test(a.name));
+  if (!asset || code <= v.code) {
+    if (!silent) showUpdate('You\'re up to date.', false);
+    return;
+  }
+  latest = { code: code, url: asset.browser_download_url, notes: (rel.body || '').split('\n')[0] };
+  const mb = (asset.size / 1048576).toFixed(1);
+  showUpdate('Build ' + code + ' is available (' + mb + ' MB).' + (latest.notes ? '\n' + latest.notes : ''), true);
+  if (silent) showCaption('', 'Update available: build ' + code + '. Open ⚙ › APP to install.');
+}
+
+function installUpdate() {
+  if (!latest) return;
+  if (!hasNative('installUpdate')) { window.open(latest.url); return; }
+  $('btnInstallUpdate').disabled = true;
+  showUpdate('Downloading…', true);
+  Android.installUpdate(latest.url);
+}
+
+// Called from Android while updating: progress | installing | done | error
+window.onUpdate = function (type, text) {
+  if (type === 'progress') $('updateText').textContent = 'Downloading… ' + (text >= 0 ? text + '%' : '');
+  else if (type === 'installing') $('updateText').textContent = 'Confirm the install in the Android prompt.';
+  else if (type === 'error') { $('btnInstallUpdate').disabled = false; $('updateText').textContent = 'Update failed: ' + text; }
+  else if (type === 'done') $('updateText').textContent = 'Installed. Reopen the app.';
+};
+
 // ===== Sync with the wallpaper =====
 window.syncConfig = function () {
   const old = cfg;
@@ -1276,6 +1357,9 @@ startLoop();
 if (!isWall) {
   if (params.get('listen') === '1') setTimeout(() => startListen('direct'), 700);
   else resumeHandsFree(1000);
+  const v = myVersion();
+  $('verText').textContent = v.name + (v.code ? ' (build ' + v.code + ')' : '');
+  if (cfg.voice.autoUpdate) setTimeout(() => checkUpdate(true), 2500);
 }
 </script>
 </body>

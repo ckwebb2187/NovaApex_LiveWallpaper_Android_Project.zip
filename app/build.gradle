@@ -2,6 +2,9 @@ plugins {
   id 'com.android.application'
 }
 
+// Each CI build gets a higher version number, so the in-app updater can tell what's newer
+def buildNum = (System.getenv('GITHUB_RUN_NUMBER') ?: '4').toInteger()
+
 android {
   namespace 'com.nova.apex.wallpaper'
   compileSdk 34
@@ -10,8 +13,27 @@ android {
     applicationId 'com.nova.apex.wallpaper'
     minSdk 24
     targetSdk 34
-    versionCode 4
-    versionName '3.0'
+    versionCode buildNum
+    versionName "3.1." + buildNum
+  }
+
+  // Same key for every build, so updates install over the old version.
+  // The key comes from GitHub secrets; without them the build uses a throwaway debug key.
+  def ksFile = file('release.keystore')
+  if (ksFile.exists() && System.getenv('NOVA_KEY_PASSWORD')) {
+    signingConfigs {
+      nova {
+        storeFile ksFile
+        storePassword System.getenv('NOVA_KEY_PASSWORD')
+        keyAlias 'nova'
+        keyPassword System.getenv('NOVA_KEY_PASSWORD')
+      }
+    }
+    buildTypes {
+      debug {
+        signingConfig signingConfigs.nova
+      }
+    }
   }
 
   compileOptions {
