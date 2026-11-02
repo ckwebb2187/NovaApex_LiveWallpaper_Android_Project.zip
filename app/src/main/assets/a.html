@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Nova Apex Studio</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;}
+html,body{width:100%;height:100%;}
+body{background:#060913;color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;overflow:hidden;}
+#bgCanvas{position:fixed;inset:0;width:100%;height:100%;z-index:1;touch-action:none;}
+
+.hud-top{position:fixed;top:36px;left:18px;right:18px;z-index:10;display:flex;justify-content:space-between;align-items:center;pointer-events:none;}
+.pill{background:rgba(15,23,42,0.75);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid rgba(56,189,248,0.35);padding:6px 14px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:0.8px;color:var(--p);display:flex;align-items:center;gap:6px;box-shadow:0 4px 15px rgba(0,0,0,0.4);}
+.dot{width:7px;height:7px;border-radius:50%;background:#10b981;box-shadow:0 0 8px #10b981;}
+
+.quick-dock{position:fixed;bottom:28px;left:50%;transform:translateX(-50%);z-index:10;display:flex;gap:8px;background:rgba(15,23,42,0.8);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);padding:6px;border-radius:18px;border:1px solid rgba(255,255,255,0.1);box-shadow:0 10px 30px rgba(0,0,0,0.6);}
+.qbtn{padding:8px 14px;border-radius:12px;font-size:11px;font-weight:700;color:#94a3b8;background:transparent;border:0;cursor:pointer;letter-spacing:0.5px;}
+.qbtn.act{color:#060913;background:var(--p);}
+
+.drawer{position:fixed;left:0;right:0;bottom:0;z-index:20;background:rgba(10,15,30,0.94);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-top:1px solid rgba(255,255,255,0.08);border-radius:22px 22px 0 0;transform:translateY(100%);transition:transform .3s ease;max-height:78vh;overflow-y:auto;padding:18px 18px 28px;}
+.drawer.open{transform:translateY(0);}
+#drawerToggle{position:fixed;right:18px;top:84px;z-index:21;width:44px;height:44px;border-radius:50%;border:1px solid rgba(255,255,255,0.15);background:rgba(15,23,42,0.85);color:var(--p);font-size:18px;font-weight:700;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:transform .3s;}
+#drawerToggle.open{transform:rotate(90deg);}
+.sec-label{font-size:10px;font-weight:700;letter-spacing:1.2px;color:#64748b;margin:16px 0 8px;text-transform:uppercase;}
+.sec-label:first-child{margin-top:0;}
+.swatch-row{display:flex;gap:10px;}
+.swatch{width:38px;height:38px;border-radius:50%;border:2px solid transparent;cursor:pointer;}
+.swatch.act{border-color:#fff;box-shadow:0 0 12px rgba(255,255,255,0.4);}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.opt-btn{padding:10px;border-radius:12px;border:1px solid rgba(255,255,255,0.1);background:rgba(30,41,59,0.6);color:#cbd5e1;font-size:12px;font-weight:700;cursor:pointer;}
+.opt-btn.act{border-color:var(--p);color:var(--p);background:rgba(56,189,248,0.08);}
+.slider-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+.slider-row span{font-size:12px;color:#cbd5e1;width:70px;}
+.slider-row b{font-size:12px;color:var(--p);width:38px;text-align:right;}
+.slider-row input{flex:1;accent-color:var(--p);}
+.apply-btn{margin-top:20px;width:100%;padding:14px;border:0;border-radius:14px;font-size:14px;font-weight:800;letter-spacing:0.8px;color:#060913;background:var(--p);box-shadow:0 6px 20px rgba(0,0,0,0.5);cursor:pointer;}
+
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
+.grid-3+.grid-3,.grid-2+.grid-3{margin-top:8px;}
+.color-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+.cswatch{width:30px;height:30px;border-radius:50%;border:2px solid transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#060913;}
+.cswatch.act{border-color:#fff;box-shadow:0 0 10px rgba(255,255,255,0.4);}
+#clockColor{width:34px;height:34px;border:0;background:none;padding:0;}
+#clock{position:fixed;left:0;right:0;z-index:5;text-align:center;pointer-events:none;color:var(--c);transition:top .3s,bottom .3s;}
+#clock.pos-top{top:13%;}
+#clock.pos-middle{top:50%;transform:translateY(-50%);}
+#clock.pos-bottom{bottom:17%;}
+#clockTime{font-size:calc(64px * var(--cs));line-height:1;font-variant-numeric:tabular-nums;}
+#clockTime small{font-size:0.38em;margin-left:0.25em;opacity:0.8;}
+#clockDate{margin-top:8px;font-size:calc(15px * var(--cs));letter-spacing:2px;text-transform:uppercase;opacity:0.85;}
+#clock.glow{text-shadow:0 0 18px var(--c),0 0 40px var(--c);}
+#clock.f-thin{font-weight:200;}
+#clock.f-sans{font-weight:500;}
+#clock.f-heavy{font-weight:900;letter-spacing:-1px;}
+#clock.f-mono{font-family:"Courier New",ui-monospace,monospace;font-weight:700;}
+#clock.f-serif{font-family:Georgia,"Times New Roman",serif;font-weight:400;font-style:italic;}
+body.wallpaper .hud-top,body.wallpaper .quick-dock,body.wallpaper .drawer,body.wallpaper #drawerToggle{display:none;}
+</style>
+</head>
+<body>
+<canvas id="bgCanvas"></canvas>
+
+<div id="clock"><div id="clockTime"></div><div id="clockDate"></div></div>
+
+<div class="hud-top">
+  <div class="pill" id="statePill"><span class="dot" id="stateDot"></span><span id="stateLabel">IDLE</span></div>
+  <div class="pill" id="aiPill"><span id="aiIcon">✦</span><span id="aiLabel">GEMINI</span></div>
+</div>
+
+<div class="quick-dock" id="quickDock">
+  <button class="qbtn act" id="qStateBtn">STATE</button>
+  <button class="qbtn" id="qPulseBtn">PULSE</button>
+  <button class="qbtn" id="qAiBtn">CORE</button>
+</div>
+
+<button id="drawerToggle"><span id="drawerArrow">⚙</span></button>
+
+<div class="drawer" id="drawer">
+  <div class="sec-label">Theme</div>
+  <div class="swatch-row" id="swatches"></div>
+
+  <div class="sec-label">Core style</div>
+  <div class="grid-2">
+    <button class="opt-btn" data-ai="gemini">✦ Gemini</button>
+    <button class="opt-btn" data-ai="claude">✳ Claude</button>
+  </div>
+
+  <div class="sec-label">State</div>
+  <div class="grid-2" id="stateBtns"></div>
+
+  <div class="sec-label">Clock</div>
+  <div class="grid-2">
+    <button class="opt-btn" data-clk="on" data-val="true">Clock on</button>
+    <button class="opt-btn" data-clk="on" data-val="false">Clock off</button>
+  </div>
+
+  <div class="sec-label">Clock style</div>
+  <div class="grid-3" id="clockStyles"></div>
+
+  <div class="sec-label">Clock position</div>
+  <div class="grid-3">
+    <button class="opt-btn" data-clk="pos" data-val="top">Top</button>
+    <button class="opt-btn" data-clk="pos" data-val="middle">Middle</button>
+    <button class="opt-btn" data-clk="pos" data-val="bottom">Bottom</button>
+  </div>
+
+  <div class="sec-label">Clock format</div>
+  <div class="grid-2">
+    <button class="opt-btn" data-clk="h24" data-val="false">12-hour</button>
+    <button class="opt-btn" data-clk="h24" data-val="true">24-hour</button>
+  </div>
+  <div class="grid-3">
+    <button class="opt-btn" data-clk-toggle="secs">Seconds</button>
+    <button class="opt-btn" data-clk-toggle="date">Date</button>
+    <button class="opt-btn" data-clk-toggle="glow">Glow</button>
+  </div>
+
+  <div class="sec-label">Clock font</div>
+  <div class="grid-3">
+    <button class="opt-btn" data-clk="font" data-val="thin">Thin</button>
+    <button class="opt-btn" data-clk="font" data-val="sans">Sans</button>
+    <button class="opt-btn" data-clk="font" data-val="heavy">Heavy</button>
+    <button class="opt-btn" data-clk="font" data-val="mono">Mono</button>
+    <button class="opt-btn" data-clk="font" data-val="serif">Serif</button>
+  </div>
+
+  <div class="sec-label">Clock color</div>
+  <div class="color-row" id="clockColors"><input type="color" id="clockColor"></div>
+
+  <div class="slider-row" style="margin-top:12px"><span>Clock size</span><input type="range" id="rngClockSize" min="0.5" max="2" step="0.05"><b id="valClockSize"></b></div>
+
+  <div class="sec-label">Tuning</div>
+  <div class="slider-row"><span>Speed</span><input type="range" id="rngSpeed" min="0.2" max="3" step="0.1"><b id="valSpeed"></b></div>
+  <div class="slider-row"><span>Particles</span><input type="range" id="rngParticles" min="20" max="300" step="10"><b id="valParticles"></b></div>
+  <div class="slider-row"><span>Arcs</span><input type="range" id="rngArcs" min="0" max="1" step="0.05"><b id="valArcs"></b></div>
+  <div class="slider-row"><span>Size</span><input type="range" id="rngSize" min="0.5" max="1.8" step="0.05"><b id="valSize"></b></div>
+
+  <button class="apply-btn" id="applyBtn">SET AS LIVE WALLPAPER</button>
+</div>
+
+<script>
+// Themes: p = primary, a = accent
+const THEMES = {
+  cyan:    { p: '#38bdf8', a: '#6366f1' },
+  violet:  { p: '#a78bfa', a: '#ec4899' },
+  ember:   { p: '#fb923c', a: '#ef4444' },
+  emerald: { p: '#34d399', a: '#0ea5e9' },
+  rose:    { p: '#f472b6', a: '#f59e0b' }
+};
+const STATES = {
+  idle:      { label: 'IDLE',      rate: 0.6, dot: '#10b981' },
+  listening: { label: 'LISTENING', rate: 1.0, dot: '#38bdf8' },
+  thinking:  { label: 'THINKING',  rate: 1.8, dot: '#f59e0b' },
+  speaking:  { label: 'SPEAKING',  rate: 1.3, dot: '#a78bfa' }
+};
+const STATE_KEYS = Object.keys(STATES);
+const DEFAULTS = { theme: 'cyan', ai: 'gemini', state: 'idle', speed: 1, particles: 120, arcs: 0.35, size: 1 };
+const KEY = 'novaApexCfg';
+
+// Clock presets. Picking one sets these fields; any single change after that makes it "custom".
+const CLOCK_STYLES = {
+  minimal: { label: 'Minimal', font: 'thin',  glow: false, size: 1,    secs: false, date: true },
+  neon:    { label: 'Neon',    font: 'sans',  glow: true,  size: 1,    secs: false, date: true },
+  digital: { label: 'Digital', font: 'mono',  glow: true,  size: 0.9,  secs: true,  date: false },
+  bold:    { label: 'Bold',    font: 'heavy', glow: false, size: 1.3,  secs: false, date: true },
+  classic: { label: 'Classic', font: 'serif', glow: false, size: 1.1,  secs: false, date: true }
+};
+const CLOCK_DEFAULTS = { on: true, style: 'neon', pos: 'top', h24: false, secs: false, date: true, glow: true, font: 'sans', size: 1, color: 'theme' };
+const CLOCK_COLORS = ['theme', '#ffffff', '#38bdf8', '#a78bfa', '#f472b6', '#fb923c', '#facc15', '#34d399'];
+
+const mode = new URLSearchParams(location.search).get('mode') || 'studio';
+if (mode === 'wallpaper') document.body.classList.add('wallpaper');
+
+// Settings are shared between the studio and the wallpaper through localStorage
+function loadCfg() {
+  let c;
+  try { c = Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem(KEY) || '{}')); }
+  catch (e) { c = Object.assign({}, DEFAULTS); }
+  c.clock = Object.assign({}, CLOCK_DEFAULTS, c.clock || {});
+  return c;
+}
+function saveCfg() {
+  try { localStorage.setItem(KEY, JSON.stringify(cfg)); } catch (e) {}
+}
+let cfg = loadCfg();
+if (!THEMES[cfg.theme]) cfg.theme = DEFAULTS.theme;
+if (!STATES[cfg.state]) cfg.state = DEFAULTS.state;
+
+const $ = id => document.getElementById(id);
+const canvas = $('bgCanvas');
+const ctx = canvas.getContext('2d');
+let W = 0, H = 0, dpr = 1;
+let nodes = [], particles = [];
+let rotX = 0.3, rotY = 0, drag = null, phase = 0, empWave = 0;
+
+function th() { return THEMES[cfg.theme]; }
+
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  W = window.innerWidth; H = window.innerHeight;
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+// Points spread evenly on a sphere
+function buildNodes() {
+  nodes = [];
+  const n = 90;
+  for (let i = 0; i < n; i++) {
+    const y = 1 - (i / (n - 1)) * 2;
+    const r = Math.sqrt(1 - y * y);
+    const t = i * Math.PI * (3 - Math.sqrt(5));
+    nodes.push({ x: Math.cos(t) * r, y: y, z: Math.sin(t) * r });
+  }
+}
+
+function buildParticles() {
+  particles = [];
+  for (let i = 0; i < cfg.particles; i++) {
+    particles.push({
+      x: Math.random() * W, y: Math.random() * H,
+      vx: (Math.random() - 0.5) * 0.4, vy: (Math.random() - 0.5) * 0.4,
+      r: Math.random() * 1.6 + 0.4, a: Math.random() * 0.6 + 0.2
+    });
+  }
+}
+
+function project(p, cx, cy, rad) {
+  let x = p.x * Math.cos(rotY) - p.z * Math.sin(rotY);
+  let z = p.x * Math.sin(rotY) + p.z * Math.cos(rotY);
+  let y = p.y * Math.cos(rotX) - z * Math.sin(rotX);
+  z = p.y * Math.sin(rotX) + z * Math.cos(rotX);
+  const s = 2.4 / (2.4 + z);
+  return { x: cx + x * rad * s, y: cy + y * rad * s, z: z, s: s };
+}
+
+function render() {
+  const t = th();
+  const st = STATES[cfg.state];
+  const rate = cfg.speed * st.rate;
+  phase += 0.016 * rate;
+  if (!drag) { rotY += 0.004 * rate; }
+
+  ctx.fillStyle = '#060913';
+  ctx.fillRect(0, 0, W, H);
+
+  // Background glow
+  const cx = W / 2, cy = H / 2;
+  const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(W, H) * 0.7);
+  glow.addColorStop(0, t.a + '33');
+  glow.addColorStop(1, '#06091300');
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, W, H);
+
+  // Drifting particles
+  ctx.fillStyle = t.p;
+  for (const p of particles) {
+    p.x += p.vx * rate; p.y += p.vy * rate;
+    if (p.x < 0) p.x = W; if (p.x > W) p.x = 0;
+    if (p.y < 0) p.y = H; if (p.y > H) p.y = 0;
+    ctx.globalAlpha = p.a;
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  // Neural sphere
+  const rad = Math.min(W, H) * 0.32 * cfg.size * (1 + Math.sin(phase * 2) * 0.03);
+  const pts = nodes.map(n => project(n, cx, cy, rad));
+  ctx.lineWidth = 0.6;
+  for (let i = 0; i < pts.length; i++) {
+    for (let j = i + 1; j < pts.length; j++) {
+      const dx = nodes[i].x - nodes[j].x, dy = nodes[i].y - nodes[j].y, dz = nodes[i].z - nodes[j].z;
+      const d = dx * dx + dy * dy + dz * dz;
+      if (d < 0.12) {
+        const depth = (pts[i].z + pts[j].z) / 2;
+        ctx.strokeStyle = t.p;
+        ctx.globalAlpha = Math.max(0.05, 0.35 - depth * 0.25) * (1 - d / 0.12);
+        ctx.beginPath(); ctx.moveTo(pts[i].x, pts[i].y); ctx.lineTo(pts[j].x, pts[j].y); ctx.stroke();
+      }
+    }
+  }
+  for (const p of pts) {
+    ctx.globalAlpha = Math.max(0.15, 0.9 - p.z * 0.5);
+    ctx.fillStyle = p.z < 0 ? t.p : t.a;
+    ctx.beginPath(); ctx.arc(p.x, p.y, 2.2 * p.s, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  // Lightning arcs from the core
+  if (Math.random() < cfg.arcs * rate * 0.5) {
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    const ang = Math.random() * Math.PI * 2;
+    const r = (70 + Math.random() * 65) * cfg.size;
+    for (let s = 1; s <= 4; s++) {
+      const n = s / 4;
+      ctx.lineTo(cx + Math.cos(ang) * r * n + (Math.random() - 0.5) * 18, cy + Math.sin(ang) * r * n + (Math.random() - 0.5) * 18);
+    }
+    ctx.stroke();
+  }
+
+  // Pulsing core
+  const pulseR = (26 + Math.sin(phase * 3) * 5) * cfg.size;
+  const core = ctx.createRadialGradient(cx, cy, 2, cx, cy, pulseR * 2.4);
+  core.addColorStop(0, '#ffffff');
+  core.addColorStop(0.35, t.p);
+  core.addColorStop(0.75, t.a + '66');
+  core.addColorStop(1, 'transparent');
+  ctx.fillStyle = core;
+  ctx.beginPath(); ctx.arc(cx, cy, pulseR * 2.4, 0, Math.PI * 2); ctx.fill();
+
+  ctx.fillStyle = '#060913';
+  ctx.font = 'bold ' + Math.round(14 * cfg.size) + 'px sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(cfg.ai === 'claude' ? '✳' : '✦', cx, cy);
+
+  // Shockwave ring
+  if (empWave > 0) {
+    ctx.strokeStyle = t.p;
+    ctx.lineWidth = 3 * (1 - empWave);
+    ctx.beginPath(); ctx.arc(cx, cy, empWave * 220 * cfg.size, 0, Math.PI * 2); ctx.stroke();
+    empWave += 0.035;
+    if (empWave >= 1) empWave = 0;
+  }
+
+  requestAnimationFrame(render);
+}
+
+function pulse() { empWave = 0.01; }
+
+// Drag to spin the sphere, tap to pulse
+canvas.addEventListener('pointerdown', e => { drag = { x: e.clientX, y: e.clientY, moved: false }; });
+window.addEventListener('pointermove', e => {
+  if (!drag) return;
+  const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+  if (Math.abs(dx) + Math.abs(dy) > 4) drag.moved = true;
+  rotY += dx * 0.008;
+  rotX = Math.max(-1.2, Math.min(1.2, rotX + dy * 0.008));
+  drag.x = e.clientX; drag.y = e.clientY;
+});
+window.addEventListener('pointerup', () => { if (drag && !drag.moved) pulse(); drag = null; });
+
+// ---- Studio UI ----
+// ---- Clock ----
+function clockColor() { return cfg.clock.color === 'theme' ? th().p : cfg.clock.color; }
+
+function tickClock() {
+  const k = cfg.clock;
+  const el = $('clock');
+  el.style.display = k.on ? '' : 'none';
+  if (!k.on) return;
+  const d = new Date();
+  let h = d.getHours();
+  let ampm = '';
+  if (!k.h24) { ampm = h < 12 ? 'AM' : 'PM'; h = h % 12 || 12; }
+  const pad = n => String(n).padStart(2, '0');
+  let t = (k.h24 ? pad(h) : h) + ':' + pad(d.getMinutes());
+  if (k.secs) t += ':' + pad(d.getSeconds());
+  $('clockTime').innerHTML = t + (ampm ? '<small>' + ampm + '</small>' : '');
+  $('clockDate').style.display = k.date ? '' : 'none';
+  if (k.date) $('clockDate').textContent = d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+}
+
+function styleClock() {
+  const k = cfg.clock;
+  const el = $('clock');
+  el.className = 'pos-' + k.pos + ' f-' + k.font + (k.glow ? ' glow' : '');
+  el.style.setProperty('--c', clockColor());
+  el.style.setProperty('--cs', k.size);
+  tickClock();
+}
+
+function setClock(k, v) {
+  cfg.clock[k] = v;
+  // Changing a look setting by hand turns the preset into a custom style
+  if (['font', 'glow', 'size', 'secs', 'date'].includes(k)) cfg.clock.style = 'custom';
+  saveCfg();
+  updateUI();
+}
+
+function applyClockStyle(name) {
+  const p = CLOCK_STYLES[name];
+  Object.keys(p).forEach(key => { if (key !== 'label') cfg.clock[key] = p[key]; });
+  cfg.clock.style = name;
+  saveCfg();
+  updateUI();
+}
+
+function buildClockUI() {
+  const box = $('clockStyles');
+  Object.keys(CLOCK_STYLES).concat('custom').forEach(k => {
+    const b = document.createElement('button');
+    b.className = 'opt-btn';
+    b.dataset.clkStyle = k;
+    b.textContent = k === 'custom' ? 'Custom' : CLOCK_STYLES[k].label;
+    if (k !== 'custom') b.onclick = () => applyClockStyle(k);
+    else b.style.opacity = '0.6';
+    box.appendChild(b);
+  });
+
+  const row = $('clockColors');
+  const picker = $('clockColor');
+  CLOCK_COLORS.forEach(c => {
+    const s = document.createElement('div');
+    s.className = 'cswatch';
+    s.dataset.color = c;
+    if (c === 'theme') { s.textContent = 'T'; s.style.background = 'var(--p)'; }
+    else s.style.background = c;
+    s.onclick = () => setClock('color', c);
+    row.insertBefore(s, picker);
+  });
+  picker.oninput = e => setClock('color', e.target.value);
+
+  document.querySelectorAll('[data-clk]').forEach(b => {
+    b.onclick = () => {
+      let v = b.dataset.val;
+      if (v === 'true') v = true; else if (v === 'false') v = false;
+      setClock(b.dataset.clk, v);
+    };
+  });
+  document.querySelectorAll('[data-clk-toggle]').forEach(b => {
+    b.onclick = () => setClock(b.dataset.clkToggle, !cfg.clock[b.dataset.clkToggle]);
+  });
+  $('rngClockSize').oninput = e => setClock('size', parseFloat(e.target.value));
+}
+
+function updateClockUI() {
+  const k = cfg.clock;
+  document.querySelectorAll('[data-clk]').forEach(b => b.classList.toggle('act', String(k[b.dataset.clk]) === b.dataset.val));
+  document.querySelectorAll('[data-clk-toggle]').forEach(b => b.classList.toggle('act', !!k[b.dataset.clkToggle]));
+  document.querySelectorAll('[data-clk-style]').forEach(b => b.classList.toggle('act', b.dataset.clkStyle === k.style));
+  document.querySelectorAll('.cswatch').forEach(s => s.classList.toggle('act', s.dataset.color === k.color));
+  if (k.color !== 'theme') $('clockColor').value = k.color;
+  $('rngClockSize').value = k.size;
+  $('valClockSize').textContent = k.size + 'x';
+}
+
+function updateUI() {
+  const t = th();
+  document.documentElement.style.setProperty('--p', t.p);
+  const st = STATES[cfg.state];
+  $('stateLabel').textContent = st.label;
+  $('stateDot').style.background = st.dot;
+  $('stateDot').style.boxShadow = '0 0 8px ' + st.dot;
+  $('aiIcon').textContent = cfg.ai === 'claude' ? '✳' : '✦';
+  $('aiLabel').textContent = cfg.ai === 'claude' ? 'CLAUDE' : 'GEMINI';
+  styleClock();
+  updateClockUI();
+  document.querySelectorAll('.swatch').forEach(s => s.classList.toggle('act', s.dataset.theme === cfg.theme));
+  document.querySelectorAll('[data-ai]').forEach(b => b.classList.toggle('act', b.dataset.ai === cfg.ai));
+  document.querySelectorAll('[data-state]').forEach(b => b.classList.toggle('act', b.dataset.state === cfg.state));
+  [['Speed', 'speed', 'x'], ['Particles', 'particles', ''], ['Arcs', 'arcs', ''], ['Size', 'size', 'x']].forEach(([id, k, u]) => {
+    $('rng' + id).value = cfg[k];
+    $('val' + id).textContent = cfg[k] + u;
+  });
+}
+
+function set(k, v) {
+  cfg[k] = v;
+  if (k === 'particles') buildParticles();
+  saveCfg();
+  updateUI();
+}
+
+function buildUI() {
+  const sw = $('swatches');
+  Object.keys(THEMES).forEach(k => {
+    const d = document.createElement('div');
+    d.className = 'swatch';
+    d.dataset.theme = k;
+    d.style.background = 'linear-gradient(135deg,' + THEMES[k].p + ',' + THEMES[k].a + ')';
+    d.onclick = () => set('theme', k);
+    sw.appendChild(d);
+  });
+  const sb = $('stateBtns');
+  STATE_KEYS.forEach(k => {
+    const b = document.createElement('button');
+    b.className = 'opt-btn';
+    b.dataset.state = k;
+    b.textContent = STATES[k].label;
+    b.onclick = () => set('state', k);
+    sb.appendChild(b);
+  });
+  document.querySelectorAll('[data-ai]').forEach(b => b.onclick = () => set('ai', b.dataset.ai));
+  [['Speed', 'speed'], ['Particles', 'particles'], ['Arcs', 'arcs'], ['Size', 'size']].forEach(([id, k]) => {
+    $('rng' + id).oninput = e => set(k, parseFloat(e.target.value));
+  });
+
+  $('qStateBtn').onclick = () => set('state', STATE_KEYS[(STATE_KEYS.indexOf(cfg.state) + 1) % STATE_KEYS.length]);
+  $('qPulseBtn').onclick = pulse;
+  $('qAiBtn').onclick = () => set('ai', cfg.ai === 'claude' ? 'gemini' : 'claude');
+
+  $('drawerToggle').onclick = () => {
+    $('drawer').classList.toggle('open');
+    $('drawerToggle').classList.toggle('open');
+  };
+
+  $('applyBtn').onclick = () => {
+    saveCfg();
+    if (window.Android && Android.applyWallpaper) {
+      Android.applyWallpaper();
+    } else {
+      alert('Open this in the Nova Apex app to set the wallpaper.');
+    }
+  };
+}
+
+// Called by the wallpaper service when it becomes visible
+window.syncConfig = function () {
+  const old = cfg.particles;
+  cfg = loadCfg();
+  if (cfg.particles !== old) buildParticles();
+  updateUI();
+};
+
+window.addEventListener('resize', () => { resize(); buildParticles(); });
+resize();
+buildNodes();
+buildParticles();
+buildUI();
+buildClockUI();
+updateUI();
+setInterval(tickClock, 1000);
+render();
+</script>
+</body>
+</html>
