@@ -241,12 +241,20 @@ body.wallpaper #hotkeys,body.wallpaper #askBar,body.wallpaper #caption{display:n
       <button class="opt-btn" data-vt="wallTap">Double-tap wallpaper to talk</button>
       <button class="opt-btn" data-vt="hotkeys">Show hotkeys</button>
     </div>
+    <div class="sec-label">Listen outside the app</div>
+    <div class="grid-2">
+      <button class="opt-btn" data-vt="bgListen">On wallpaper &amp; home screen</button>
+      <button class="opt-btn" data-vt="bgScreenOff">Also with screen off</button>
+    </div>
+    <button class="opt-btn" id="btnPopUp" style="width:100%;margin-top:8px">Allow Nova to pop up (display over other apps)</button>
+    <div class="note" id="bgNote">Nova keeps a "Nova is listening" notification while it listens in the background — Android requires it. Screen-off listening uses noticeably more battery.</div>
+
     <div class="slider-row" style="margin-top:12px"><span>Voice speed</span><input type="range" id="rngVoiceRate" min="0.6" max="1.6" step="0.05"><b id="valVoiceRate"></b></div>
 
     <div class="sec-label">Wake word</div>
     <input class="inp" id="inpWake" autocomplete="off">
     <div class="note" id="lastHeard">Last heard: —</div>
-    <div class="note">In hands-free mode, Nova listens while the app is open and only responds after the wake word, like "Hey Nova, hyperdrive." Android plays a short tone each time listening restarts. Hands-free stays off on the wallpaper to save battery and keep the mic private.</div>
+    <div class="note">In hands-free mode, Nova listens while the app is open and only responds after the wake word, like "Hey Nova, hyperdrive." Turn on "Listen outside the app" above to use the wake word from the wallpaper, home screen or with the screen off.</div>
 
     <div class="sec-label">Commands &amp; hotkeys</div>
     <div id="cmdList"></div>
@@ -315,7 +323,7 @@ const CLOCK_STYLES = {
 const CLOCK_DEFAULTS = { on: true, style: 'neon', pos: 'top', h24: false, secs: false, date: true, glow: true, font: 'sans', size: 1, color: 'theme' };
 const CLOCK_COLORS = ['theme', '#ffffff', '#38bdf8', '#a78bfa', '#f472b6', '#fb923c', '#facc15', '#34d399'];
 
-const VOICE_DEFAULTS = { autoUpdate: true, speak: true, handsFree: false, wallTap: true, hotkeys: true, rate: 1, wake: 'hey nova' };
+const VOICE_DEFAULTS = { bgListen: false, bgScreenOff: false, autoUpdate: true, speak: true, handsFree: false, wallTap: true, hotkeys: true, rate: 1, wake: 'hey nova' };
 const DEFAULT_COMMANDS = [
   { p: 'pulse', a: 'pulse', v: '', hk: true },
   { p: 'next theme', a: 'nextTheme', v: '', hk: true },
@@ -901,10 +909,14 @@ function buildUI() {
     cfg.voice[k] = !cfg.voice[k];
     saveCfg(); updateUI();
     if (k === 'handsFree') { if (cfg.voice.handsFree) startListen('wake'); else stopListen(); }
+    if (k === 'bgScreenOff' && cfg.voice.bgScreenOff && !cfg.voice.bgListen) { cfg.voice.bgListen = true; saveCfg(); updateUI(); }
+    if (k === 'bgListen' || k === 'bgScreenOff') syncBg();
   });
+  $('btnPopUp').onclick = () => { if (hasNative('openPopUpSettings')) Android.openPopUpSettings(); };
   $('rngVoiceRate').oninput = e => { cfg.voice.rate = parseFloat(e.target.value); saveCfg(); updateUI(); };
   $('inpWake').value = cfg.voice.wake;
   $('inpWake').oninput = e => { cfg.voice.wake = e.target.value; saveCfg(); };
+  $('inpWake').onchange = () => { if (cfg.voice.bgListen) syncBg(); };
   $('btnAddCmd').onclick = () => { cfg.commands.push({ p: '', a: 'pulse', v: '', hk: false }); saveCfg(); renderCommands(); };
   renderCommands();
 
@@ -1119,7 +1131,7 @@ window.onVoice = function (type, text) {
   }
   if (type === 'error') {
     listening = false;
-    if (text === 'permission') { cfg.voice.handsFree = false; saveCfg(); setLive(null); showCaption('', 'Nova needs microphone permission to listen.'); return; }
+    if (text === 'permission') { cfg.voice.handsFree = false; cfg.voice.bgListen = false; saveCfg(); setLive(null); showCaption('', 'Nova needs microphone permission to listen.'); return; }
     if (text === 'unavailable') { setLive(null); showCaption('', 'Speech recognition isn\'t available on this phone. Install or update the Google app.'); return; }
     if (m === 'direct') { setLive(null); showCaption('', text === 'no-match' ? 'I didn\'t catch that.' : 'Voice error: ' + text); }
     else if (live === 'listening') setLive(null);
@@ -1227,7 +1239,7 @@ window.onAppPause = function () {
   if (window.speechSynthesis) speechSynthesis.cancel();
   if (live) setLive(null);
 };
-window.onAppResume = function () { resumeHandsFree(800); };
+window.onAppResume = function () { resumeHandsFree(800); updateBgStatus(); };
 
 // ===== AI =====
 let history = [];
@@ -1320,6 +1332,32 @@ async function askAI(text, isTest) {
   say(reply, you);
 }
 
+// ===== Background listening (handled by the Android service) =====
+function syncBg() {
+  if (hasNative('setBackgroundListen')) Android.setBackgroundListen(!!cfg.voice.bgListen, cfg.voice.wake || 'hey nova', !!cfg.voice.bgScreenOff);
+  setTimeout(updateBgStatus, 800);
+}
+
+function updateBgStatus() {
+  if (!hasNative('canPopUp')) return;
+  const pop = Android.canPopUp();
+  $('btnPopUp').textContent = pop ? '✓ Nova can pop up over other apps' : 'Allow Nova to pop up (display over other apps)';
+  $('btnPopUp').classList.toggle('act', pop);
+  if (cfg.voice.bgListen && !Android.isBackgroundListening()) {
+    $('bgNote').textContent = 'Background listening is off. Make sure Nova has microphone permission, then turn it on again.';
+  } else if (cfg.voice.bgListen && !pop) {
+    $('bgNote').textContent = 'Listening. Without the pop-up permission, Nova shows a notification you tap after the wake word.';
+  } else {
+    $('bgNote').textContent = 'Nova keeps a "Nova is listening" notification while it listens in the background — Android requires it. Screen-off listening uses noticeably more battery.';
+  }
+}
+
+// Called by Android when the wake word was heard outside the app
+window.voiceCommand = function (text) {
+  pulse();
+  setTimeout(() => handleUtterance(text), 300);
+};
+
 // ===== In-app updates =====
 const RELEASES = 'https://api.github.com/repos/ckwebb2187/NovaApex_LiveWallpaper_Android_Project.zip/releases/latest';
 let latest = null;
@@ -1406,8 +1444,15 @@ updateUI();
 setInterval(tickClock, 1000);
 startLoop();
 if (!isWall) {
-  if (params.get('listen') === '1') setTimeout(() => startListen('direct'), 700);
+  if (params.get('say')) setTimeout(() => window.voiceCommand(params.get('say')), 700);
+  else if (params.get('listen') === '1') setTimeout(() => startListen('direct'), 700);
   else resumeHandsFree(1000);
+  // Restart background listening after a reboot, unless it was stopped from the notification
+  if (cfg.voice.bgListen && hasNative('isBackgroundListening') && !Android.isBackgroundListening()) {
+    if (Android.bgStoppedByUser()) { cfg.voice.bgListen = false; saveCfg(); updateUI(); }
+    else syncBg();
+  }
+  setTimeout(updateBgStatus, 1000);
   const v = myVersion();
   $('verText').textContent = v.name + (v.code ? ' (build ' + v.code + ')' : '');
   if (cfg.voice.autoUpdate) setTimeout(() => checkUpdate(true), 2500);
