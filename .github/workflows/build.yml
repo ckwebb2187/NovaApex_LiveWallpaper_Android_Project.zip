@@ -13,15 +13,12 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
       - name: Install Gradle 8.5
         run: |
           wget -q https://services.gradle.org/distributions/gradle-8.5-bin.zip -P /tmp
           sudo unzip -q -o /tmp/gradle-8.5-bin.zip -d /opt/gradle
 
-      - name: Build APK with Gradle
+      - name: Build APK with Gradle 8.5
         run: |
           for f in *.zip; do
             [ -f "$f" ] && unzip -q -o "$f"
@@ -32,13 +29,12 @@ jobs:
             cd "$PROJECT_DIR"
           fi
 
-          echo "sdk.dir=$ANDROID_HOME" > local.properties
+          echo "sdk.dir=/usr/local/lib/android/sdk" > local.properties
 
-          /opt/gradle/gradle-8.5/bin/gradle assembleDebug --no-daemon
+          /opt/gradle/gradle-8.5/bin/gradle assembleDebug --no-daemon 2>&1 | tee build.log || (echo "=== ERROR SUMMARY ===" && grep -A 8 "What went wrong" build.log && exit 1)
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: NovaApex-LiveWallpaper-APK
           path: "**/app/build/outputs/apk/debug/*.apk"
-          
