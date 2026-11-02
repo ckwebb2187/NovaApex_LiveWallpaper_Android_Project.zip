@@ -26,10 +26,19 @@ body{background:#060913;color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFo
 #askBar{position:fixed;bottom:86px;left:12px;right:12px;z-index:12;display:none;gap:8px;}
 #askBar.open{display:flex;}
 #askBar input{flex:1;}
-#caption{position:fixed;left:16px;right:16px;bottom:140px;z-index:9;text-align:center;pointer-events:none;opacity:0;transition:opacity .4s;}
+#caption{position:fixed;left:16px;right:16px;z-index:9;text-align:center;pointer-events:none;opacity:0;transition:opacity .4s;color:var(--cc);}
 #caption.show{opacity:1;}
-#caption div{display:inline-block;max-width:100%;background:rgba(10,15,30,0.82);border:1px solid rgba(255,255,255,0.1);border-radius:14px;padding:10px 14px;font-size:13px;line-height:1.45;max-height:30vh;overflow:hidden;}
-#capYou{color:#94a3b8;font-size:11px;margin-bottom:4px;display:block;}
+#caption.pos-top{top:26%;}
+#caption.pos-middle{top:50%;transform:translateY(-50%);}
+#caption.pos-bottom{top:70%;}
+#capBox{display:inline-block;max-width:100%;font-size:calc(13px * var(--ks));line-height:1.45;max-height:30vh;overflow:hidden;}
+#capYou{font-size:0.8em;margin-bottom:4px;display:block;opacity:0.65;}
+/* caption styles */
+#caption.cs-bubble #capBox{background:rgba(10,15,30,0.82);border:1px solid rgba(255,255,255,0.1);border-radius:14px;padding:10px 14px;color:#f1f5f9;}
+#caption.cs-bubble #capYou{color:#94a3b8;opacity:1;}
+#caption.cs-glow #capBox{font-size:calc(17px * var(--ks));letter-spacing:0.5px;text-shadow:0 0 8px var(--cc),0 0 22px var(--cc),0 0 42px var(--cc);}
+#caption.cs-glow #capText{color:#fff;text-shadow:0 0 6px var(--cc),0 0 18px var(--cc),0 0 36px var(--cc);}
+#caption.cs-plain #capBox{font-size:calc(15px * var(--ks));text-shadow:0 1px 3px rgba(0,0,0,0.9),0 0 10px rgba(0,0,0,0.6);}
 
 /* Settings drawer */
 .drawer{position:fixed;left:0;right:0;bottom:0;z-index:20;background:rgba(10,15,30,0.95);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-top:1px solid rgba(255,255,255,0.08);border-radius:22px 22px 0 0;transform:translateY(100%);transition:transform .3s ease;max-height:80vh;overflow-y:auto;padding:14px 18px 28px;}
@@ -91,7 +100,6 @@ textarea.inp{min-height:70px;resize:vertical;}
 
 body.wallpaper .hud-top,body.wallpaper .quick-dock,body.wallpaper .drawer,body.wallpaper #drawerToggle,
 body.wallpaper #hotkeys,body.wallpaper #askBar{display:none;}
-body.wallpaper #caption{bottom:auto;top:66%;}
 </style>
 </head>
 <body>
@@ -104,7 +112,7 @@ body.wallpaper #caption{bottom:auto;top:66%;}
   <div class="pill" id="aiPill"><span id="aiIcon">✦</span><span id="aiLabel">GEMINI</span></div>
 </div>
 
-<div id="caption"><div><span id="capYou"></span><span id="capText"></span></div></div>
+<div id="caption"><div id="capBox"><span id="capYou"></span><span id="capText"></span></div></div>
 <div id="hotkeys"></div>
 <div id="askBar"><input class="inp" id="inpPrompt" placeholder="Ask Nova or type a command…"><button class="send-btn" id="btnSendPrompt">SEND</button></div>
 
@@ -120,7 +128,7 @@ body.wallpaper #caption{bottom:auto;top:66%;}
 <div class="drawer" id="drawer">
   <div class="tabs">
     <button data-tab="look" class="act">LOOK</button>
-    <button data-tab="clock">CLOCK</button>
+    <button data-tab="clock">TEXT</button>
     <button data-tab="ai">AI</button>
     <button data-tab="voice">VOICE</button>
     <button data-tab="app">APP</button>
@@ -197,6 +205,46 @@ body.wallpaper #caption{bottom:auto;top:66%;}
     <div class="color-row" id="clockColors"><input type="color" id="clockColor"></div>
 
     <div class="slider-row" style="margin-top:12px"><span>Clock size</span><input type="range" id="rngClockSize" min="0.5" max="2" step="0.05"><b id="valClockSize"></b></div>
+
+    <div class="sec-label" style="margin-top:24px">Nova's captions</div>
+    <div class="grid-2">
+      <button class="opt-btn" data-cap="style" data-val="bubble">Bubble</button>
+      <button class="opt-btn" data-cap="style" data-val="glow">Glowing text</button>
+      <button class="opt-btn" data-cap="style" data-val="plain">Plain text</button>
+      <button class="opt-btn" data-cap="style" data-val="off">Off</button>
+    </div>
+
+    <div class="sec-label">Caption position</div>
+    <div class="grid-3">
+      <button class="opt-btn" data-cap="pos" data-val="top">Top</button>
+      <button class="opt-btn" data-cap="pos" data-val="middle">Middle</button>
+      <button class="opt-btn" data-cap="pos" data-val="bottom">Bottom</button>
+    </div>
+
+    <div class="sec-label">Caption font</div>
+    <div class="grid-3">
+      <button class="opt-btn" data-cap="font" data-val="thin">Thin</button>
+      <button class="opt-btn" data-cap="font" data-val="sans">Sans</button>
+      <button class="opt-btn" data-cap="font" data-val="heavy">Heavy</button>
+      <button class="opt-btn" data-cap="font" data-val="mono">Mono</button>
+      <button class="opt-btn" data-cap="font" data-val="serif">Serif</button>
+    </div>
+
+    <div class="sec-label">Caption color</div>
+    <div class="color-row" id="capColors"><input type="color" id="capColor" style="width:34px;height:34px;border:0;background:none;padding:0"></div>
+
+    <div class="slider-row" style="margin-top:12px"><span>Caption size</span><input type="range" id="rngCapSize" min="0.7" max="2" step="0.05"><b id="valCapSize"></b></div>
+
+    <div class="sec-label">Stay on screen</div>
+    <div class="grid-3">
+      <button class="opt-btn" data-cap="secs" data-val="6">6 sec</button>
+      <button class="opt-btn" data-cap="secs" data-val="12">12 sec</button>
+      <button class="opt-btn" data-cap="secs" data-val="25">25 sec</button>
+    </div>
+    <div class="grid-2">
+      <button class="opt-btn" data-cap-toggle="you">Show what I said</button>
+      <button class="opt-btn" id="btnCapPreview">Preview</button>
+    </div>
   </div>
 
   <!-- AI -->
@@ -321,6 +369,14 @@ const CLOCK_STYLES = {
   classic: { label: 'Classic', font: 'serif', glow: false, size: 1.1, secs: false, date: true }
 };
 const CLOCK_DEFAULTS = { on: true, style: 'neon', pos: 'top', h24: false, secs: false, date: true, glow: true, font: 'sans', size: 1, color: 'theme' };
+const CAPTION_DEFAULTS = { style: 'bubble', pos: 'bottom', font: 'sans', color: 'theme', size: 1, secs: 12, you: true };
+const CAPTION_FONTS = {
+  thin:  { f: 'inherit', w: 200, s: 'normal' },
+  sans:  { f: 'inherit', w: 500, s: 'normal' },
+  heavy: { f: 'inherit', w: 800, s: 'normal' },
+  mono:  { f: '"Courier New",ui-monospace,monospace', w: 700, s: 'normal' },
+  serif: { f: 'Georgia,"Times New Roman",serif', w: 400, s: 'italic' }
+};
 const CLOCK_COLORS = ['theme', '#ffffff', '#38bdf8', '#a78bfa', '#f472b6', '#fb923c', '#facc15', '#34d399'];
 
 const VOICE_DEFAULTS = { bgListen: false, bgScreenOff: false, autoUpdate: true, speak: true, handsFree: false, wallTap: true, hotkeys: true, rate: 1, wake: 'hey nova' };
@@ -353,6 +409,7 @@ function readJson(k) {
 function loadCfg() {
   const c = Object.assign({}, DEFAULTS, readJson(KEY));
   c.clock = Object.assign({}, CLOCK_DEFAULTS, c.clock || {});
+  c.caption = Object.assign({}, CAPTION_DEFAULTS, c.caption || {});
   c.voice = Object.assign({}, VOICE_DEFAULTS, c.voice || {});
   c.layers = Object.assign({}, DEFAULTS.layers, c.layers || {});
   if (!Array.isArray(c.commands)) c.commands = DEFAULT_COMMANDS.map(x => Object.assign({}, x));
@@ -804,6 +861,7 @@ function updateUI() {
   $('aiIcon').textContent = cfg.ai === 'claude' ? '✳' : '✦';
   $('aiLabel').textContent = cfg.ai === 'claude' ? 'CLAUDE' : 'GEMINI';
   styleClock();
+  styleCaption();
   if (isWall) return;
 
   const act = (sel, fn) => document.querySelectorAll(sel).forEach(b => b.classList.toggle('act', fn(b)));
@@ -826,7 +884,14 @@ function updateUI() {
   act('[data-clk]', b => String(k[b.dataset.clk]) === b.dataset.val);
   act('[data-clk-toggle]', b => !!k[b.dataset.clkToggle]);
   act('[data-clk-style]', b => b.dataset.clkStyle === k.style);
-  act('.cswatch', s => s.dataset.color === k.color);
+  act('[data-color]', s => s.dataset.color === k.color);
+  const kc = cfg.caption;
+  act('[data-cap]', b => String(kc[b.dataset.cap]) === b.dataset.val);
+  act('[data-cap-toggle]', b => !!kc[b.dataset.capToggle]);
+  act('[data-cap-color]', s => s.dataset.capColor === kc.color);
+  if (kc.color !== 'theme') $('capColor').value = kc.color;
+  $('rngCapSize').value = kc.size;
+  $('valCapSize').textContent = kc.size + 'x';
   if (k.color !== 'theme') $('clockColor').value = k.color;
   $('rngClockSize').value = k.size;
   $('valClockSize').textContent = k.size + 'x';
@@ -891,6 +956,26 @@ function buildUI() {
     b.onclick = () => setClock(b.dataset.clkToggle, !cfg.clock[b.dataset.clkToggle]);
   });
   $('rngClockSize').oninput = e => setClock('size', parseFloat(e.target.value));
+
+  // Caption controls
+  const capPicker = $('capColor');
+  CLOCK_COLORS.forEach(c => {
+    const sw = document.createElement('div');
+    sw.className = 'cswatch';
+    sw.dataset.capColor = c;
+    if (c === 'theme') { sw.textContent = 'T'; sw.style.background = 'var(--p)'; }
+    else sw.style.background = c;
+    sw.onclick = () => setCaption('color', c);
+    $('capColors').insertBefore(sw, capPicker);
+  });
+  capPicker.oninput = e => setCaption('color', e.target.value);
+  document.querySelectorAll('[data-cap]').forEach(b => b.onclick = () => {
+    const v = b.dataset.cap === 'secs' ? parseInt(b.dataset.val, 10) : b.dataset.val;
+    setCaption(b.dataset.cap, v);
+  });
+  document.querySelectorAll('[data-cap-toggle]').forEach(b => b.onclick = () => setCaption(b.dataset.capToggle, !cfg.caption[b.dataset.capToggle]));
+  $('rngCapSize').oninput = e => setCaption('size', parseFloat(e.target.value));
+  $('btnCapPreview').onclick = () => showCaption('what\'s the weather like', 'Clear skies and 72 degrees. A perfect night for stargazing.');
 
   // AI settings
   $('inpGeminiKey').value = keys.gemini;
@@ -1073,11 +1158,33 @@ function matchCommand(text) {
 let capTimer = 0;
 function showCaption(you, text) {
   if (isAgent && hasNative('setCaption')) Android.setCaption(you || '', text || '');
-  $('capYou').textContent = you ? 'You: ' + you : '';
+  const k = cfg.caption;
+  if (k.style === 'off') return;
+  $('capYou').textContent = you && k.you ? (k.style === 'bubble' ? 'You: ' + you : '“' + you + '”') : '';
+  $('capYou').style.display = $('capYou').textContent ? '' : 'none';
   $('capText').textContent = text;
   $('caption').classList.add('show');
   clearTimeout(capTimer);
-  capTimer = setTimeout(() => $('caption').classList.remove('show'), 12000);
+  capTimer = setTimeout(() => $('caption').classList.remove('show'), (k.secs || 12) * 1000);
+}
+
+function styleCaption() {
+  const k = cfg.caption;
+  const el = $('caption');
+  const shown = el.classList.contains('show');
+  el.className = 'cs-' + k.style + ' pos-' + k.pos + (shown ? ' show' : '');
+  el.style.setProperty('--cc', k.color === 'theme' ? th().p : k.color);
+  el.style.setProperty('--ks', k.size);
+  const f = CAPTION_FONTS[k.font] || CAPTION_FONTS.sans;
+  $('capBox').style.fontFamily = f.f;
+  $('capBox').style.fontWeight = f.w;
+  $('capBox').style.fontStyle = f.s;
+}
+
+function setCaption(k, v) {
+  cfg.caption[k] = v;
+  saveCfg(); updateUI();
+  if (k !== 'secs') showCaption('what time is it', 'It\'s ' + new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) + '.');
 }
 
 function setLive(s) {
