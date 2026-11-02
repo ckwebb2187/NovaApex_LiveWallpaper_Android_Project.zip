@@ -14,6 +14,9 @@ import android.content.ComponentName;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
+import android.net.Uri;
+import android.provider.Settings;
+import android.view.WindowManager;
 import android.speech.RecognitionListener;
 import android.speech.RecognizerIntent;
 import android.speech.SpeechRecognizer;
@@ -50,6 +53,9 @@ public class M extends Activity {
     private TextToSpeech tts;
     private boolean ttsReady = false;
     private boolean pendingListen = false;
+    private boolean pendingBg = false;
+    private String bgWake = "hey nova";
+    private boolean bgScreenOff = false;
     private long lastLevel = 0;
     private int utterance = 0;
     private boolean recActive = false;
@@ -69,7 +75,12 @@ public class M extends Activity {
         v.setWebViewClient(new WebViewClient());
         v.addJavascriptInterface(new Bridge(), "Android");
         String url = "file:///android_asset/a.html?mode=studio";
-        if (isTalk(getIntent())) url += "&listen=1";
+        Intent start = getIntent();
+        if (isTalk(start)) {
+            String say = start.getStringExtra("say");
+            url += (say != null && !say.isEmpty()) ? "&say=" + Uri.encode(say) : "&listen=1";
+            if (start.getBooleanExtra("fromVoice", false)) showOverLock(true);
+        }
         v.loadUrl(url);
         setContentView(v);
 
@@ -96,7 +107,11 @@ public class M extends Activity {
     protected void onNewIntent(Intent i) {
         super.onNewIntent(i);
         setIntent(i);
-        if (isTalk(i)) js("window.startListen&&startListen('direct')");
+        if (!isTalk(i)) return;
+        if (i.getBooleanExtra("fromVoice", false)) showOverLock(true);
+        String say = i.getStringExtra("say");
+        if (say != null && !say.isEmpty()) js("window.voiceCommand&&voiceCommand(" + JSONObject.quote(say) + ")");
+        else js("window.startListen&&startListen('direct')");
     }
 
     private void js(String code) {
@@ -159,8 +174,39 @@ public class M extends Activity {
         if (code != REQ_MIC) return;
         boolean ok = res.length > 0 && res[0] == PackageManager.PERMISSION_GRANTED;
         if (ok && pendingListen) startRec();
-        else if (!ok) voiceEvent("error", "permission");
+        if (ok && pendingBg) startBg();
+        if (!ok) voiceEvent("error", "permission");
         pendingListen = false;
+        pendingBg = false;
+    }
+
+    // Show on top of the lock screen and wake the screen (only when opened by the wake word)
+    private void showOverLock(boolean on) {
+        if (Build.VERSION.SDK_INT >= 27) {
+            setShowWhenLocked(on);
+            setTurnScreenOn(on);
+        } else {
+            int f = WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON;
+            if (on) getWindow().addFlags(f); else getWindow().clearFlags(f);
+        }
+    }
+
+    // ---- Background listening (wallpaper / home screen / screen off) ----
+    private void startBg() {
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            pendingBg = true;
+            requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, REQ_MIC);
+            return;
+        }
+        if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission("android.permission.POST_NOTIFICATIONS") != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, 8);
+        }
+        Intent i = new Intent(this, L.class).putExtra("wake", bgWake).putExtra("screenOff", bgScreenOff);
+        try {
+            if (Build.VERSION.SDK_INT >= 26) startForegroundService(i); else startService(i);
+        } catch (Exception e) {
+            Toast.makeText(this, "Couldn't start background listening", Toast.LENGTH_LONG).show();
+        }
     }
 
     private static String firstResult(Bundle b) {
@@ -397,6 +443,42 @@ public class M extends Activity {
         }
 
         @JavascriptInterface
+        public void setBackgroundListen(boolean on, String wake, boolean screenOff) {
+            runOnUiThread(() -> {
+                bgWake = wake == null || wake.trim().isEmpty() ? "hey nova" : wake;
+                bgScreenOff = screenOff;
+                if (on) startBg();
+                else stopService(new Intent(M.this, L.class));
+            });
+        }
+
+        @JavascriptInterface
+        public boolean isBackgroundListening() {
+            return L.instance != null;
+        }
+
+        @JavascriptInterface
+        public boolean bgStoppedByUser() {
+            return getSharedPreferences(L.PREFS, MODE_PRIVATE).getBoolean("stoppedByUser", false);
+        }
+
+        @JavascriptInterface
+        public boolean canPopUp() {
+            return Settings.canDrawOverlays(M.this);
+        }
+
+        @JavascriptInterface
+        public void openPopUpSettings() {
+            runOnUiThread(() -> {
+                try {
+                    startActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + getPackageName())));
+                } catch (Exception e) {
+                    Toast.makeText(M.this, "Turn on 'Display over other apps' for Nova Apex in Settings", Toast.LENGTH_LONG).show();
+                }
+            });
+        }
+
+        @JavascriptInterface
         public void httpGet(String id, String url, String headers) {
             request(id, "GET", url, headers, null);
         }
@@ -420,6 +502,9 @@ public class M extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        // The app listens by itself while open; pause the background listener
+        L.appVisible = true;
+        if (L.instance != null) L.instance.pause();
         if (v != null) {
             v.onResume();
             js("window.onAppResume&&onAppResume()");
@@ -429,12 +514,20 @@ public class M extends Activity {
     @Override
     protected void onPause() {
         super.onPause();
+        L.appVisible = false;
+        if (L.instance != null) L.instance.resume();
         stopRec();
         if (tts != null) tts.stop();
         if (v != null) {
             v.evaluateJavascript("window.onAppPause&&onAppPause()", null);
             v.onPause();
         }
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        showOverLock(false);
     }
 
     @Override
