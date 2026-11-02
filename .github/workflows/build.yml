@@ -22,6 +22,20 @@ jobs:
           mkdir -p app/src/main/java/com/nova/apex/wallpaper app/src/main/res/xml app/src/main/assets
 
           cat << 'EOF' > settings.gradle
+          pluginManagement {
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
           rootProject.name = "NovaApexLiveWallpaper"
           include ':app'
           EOF
@@ -68,5 +82,293 @@ jobs:
                       android:name=".MainActivity"
                       android:exported="true">
                       <intent-filter>
-                          <action android:name="
-                          
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+                  <service
+                      android:name=".NovaLiveWallpaperService"
+                      android:exported="true"
+                      android:label="Nova Apex Live Wallpaper"
+                      android:permission="android.permission.BIND_WALLPAPER">
+                      <intent-filter>
+                          <action android:name="android.service.wallpaper.WallpaperService" />
+                      </intent-filter>
+                      <meta-data
+                          android:name="android.service.wallpaper"
+                          android:resource="@xml/wallpaper" />
+                  </service>
+              </application>
+          </manifest>
+          EOF
+
+          cat << 'EOF' > app/src/main/res/xml/wallpaper.xml
+          <?xml version="1.0" encoding="utf-8"?>
+          <wallpaper xmlns:android="http://schemas.android.com/apk/res/android" />
+          EOF
+
+          cat << 'EOF' > app/src/main/java/com/nova/apex/wallpaper/NovaLiveWallpaperService.java
+          package com.nova.apex.wallpaper;
+
+          import android.content.Context;
+          import android.graphics.Canvas;
+          import android.os.Handler;
+          import android.os.Looper;
+          import android.service.wallpaper.WallpaperService;
+          import android.view.MotionEvent;
+          import android.view.SurfaceHolder;
+          import android.webkit.WebChromeClient;
+          import android.webkit.WebSettings;
+          import android.webkit.WebView;
+          import android.webkit.WebViewClient;
+
+          public class NovaLiveWallpaperService extends WallpaperService {
+              @Override
+              public Engine onCreateEngine() {
+                  return new NovaWallpaperEngine();
+              }
+
+              private class NovaWallpaperEngine extends Engine {
+                  private WebView webView;
+                  private final Handler handler = new Handler(Looper.getMainLooper());
+                  private boolean visible = false;
+                  private int width = 1080;
+                  private int height = 2400;
+
+                  @Override
+                  public void onCreate(SurfaceHolder surfaceHolder) {
+                      super.onCreate(surfaceHolder);
+                      setTouchEventsEnabled(true);
+                      handler.post(() -> {
+                          Context context = NovaLiveWallpaperService.this;
+                          webView = new WebView(context);
+                          WebSettings settings = webView.getSettings();
+                          settings.setJavaScriptEnabled(true);
+                          settings.setDomStorageEnabled(true);
+                          settings.setMediaPlaybackRequiresUserGesture(false);
+                          settings.setAllowFileAccess(true);
+                          webView.setWebChromeClient(new WebChromeClient());
+                          webView.setWebViewClient(new WebViewClient());
+                          webView.loadUrl("file:///android_asset/nova_apex.html");
+                          webView.layout(0, 0, width, height);
+                      });
+                  }
+
+                  @Override
+                  public void onSurfaceChanged(SurfaceHolder holder, int format, int width, int height) {
+                      super.onSurfaceChanged(holder, format, width, height);
+                      this.width = width;
+                      this.height = height;
+                      handler.post(() -> {
+                          if (webView != null) webView.layout(0, 0, width, height);
+                      });
+                  }
+
+                  @Override
+                  public void onVisibilityChanged(boolean visible) {
+                      this.visible = visible;
+                      handler.post(() -> {
+                          if (webView != null) {
+                              if (visible) {
+                                  webView.onResume();
+                                  startRenderLoop();
+                              } else {
+                                  webView.onPause();
+                              }
+                          }
+                      });
+                  }
+
+                  private void startRenderLoop() {
+                      if (!visible) return;
+                      drawFrame();
+                      handler.postDelayed(this::startRenderLoop, 16);
+                  }
+
+                  private void drawFrame() {
+                      SurfaceHolder holder = getSurfaceHolder();
+                      Canvas canvas = null;
+                      try {
+                          canvas = holder.lockCanvas();
+                          if (canvas != null && webView != null) {
+                              webView.draw(canvas);
+                          }
+                      } finally {
+                          if (canvas != null) holder.unlockCanvasAndPost(canvas);
+                      }
+                  }
+
+                  @Override
+                  public void onTouchEvent(MotionEvent event) {
+                      super.onTouchEvent(event);
+                      handler.post(() -> {
+                          if (webView != null) webView.dispatchTouchEvent(event);
+                      });
+                  }
+
+                  @Override
+                  public void onDestroy() {
+                      super.onDestroy();
+                      handler.post(() -> {
+                          if (webView != null) {
+                              webView.destroy();
+                              webView = null;
+                          }
+                      });
+                  }
+              }
+          }
+          EOF
+
+          cat << 'EOF' > app/src/main/java/com/nova/apex/wallpaper/MainActivity.java
+          package com.nova.apex.wallpaper;
+
+          import android.app.Activity;
+          import android.app.WallpaperManager;
+          import android.content.ComponentName;
+          import android.content.Intent;
+          import android.os.Bundle;
+          import android.webkit.WebSettings;
+          import android.webkit.WebView;
+          import android.widget.Button;
+          import android.widget.RelativeLayout;
+          import android.widget.Toast;
+
+          public class MainActivity extends Activity {
+              private WebView webView;
+
+              @Override
+              protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+                  RelativeLayout layout = new RelativeLayout(this);
+                  layout.setBackgroundColor(0xFF070B14);
+
+                  webView = new WebView(this);
+                  WebSettings settings = webView.getSettings();
+                  settings.setJavaScriptEnabled(true);
+                  settings.setDomStorageEnabled(true);
+                  settings.setMediaPlaybackRequiresUserGesture(false);
+                  webView.loadUrl("file:///android_asset/nova_apex.html");
+                  layout.addView(webView, new RelativeLayout.LayoutParams(-1, -1));
+
+                  Button btn = new Button(this);
+                  btn.setText("Set as Live Wallpaper");
+                  btn.setBackgroundColor(0xFF00F2FE);
+                  btn.setTextColor(0xFF070B14);
+                  RelativeLayout.LayoutParams btnParams = new RelativeLayout.LayoutParams(-1, 140);
+                  btnParams.addRule(RelativeLayout.ALIGN_PARENT_BOTTOM);
+                  btnParams.setMargins(40, 40, 40, 40);
+                  layout.addView(btn, btnParams);
+
+                  btn.setOnClickListener(v -> {
+                      try {
+                          Intent intent = new Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER);
+                          intent.putExtra(WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT,
+                                  new ComponentName(this, NovaLiveWallpaperService.class));
+                          startActivity(intent);
+                      } catch (Exception e) {
+                          try {
+                              Intent fallback = new Intent(WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER);
+                              startActivity(fallback);
+                          } catch (Exception ex) {
+                              Toast.makeText(this, "Select 'Nova Apex Live Wallpaper' in your wallpaper settings", Toast.LENGTH_LONG).show();
+                          }
+                      }
+                  });
+
+                  setContentView(layout);
+              }
+
+              @Override
+              protected void onResume() {
+                  super.onResume();
+                  if (webView != null) webView.onResume();
+              }
+
+              @Override
+              protected void onPause() {
+                  super.onPause();
+                  if (webView != null) webView.onPause();
+              }
+          }
+          EOF
+
+          cat << 'EOF' > app/src/main/assets/nova_apex.html
+          <!DOCTYPE html>
+          <html>
+          <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+          <style>
+            * { margin:0; padding:0; box-sizing:border-box; user-select:none; }
+            body { background:#070b14; color:#fff; font-family:sans-serif; overflow:hidden; width:100vw; height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:space-between; padding:20px; }
+            .header { display:flex; align-items:center; justify-content:space-between; width:100%; z-index:20; }
+            .badge { background:rgba(0,242,254,0.15); border:1px solid rgba(0,242,254,0.4); color:#00f2fe; padding:6px 14px; border-radius:20px; font-size:12px; font-weight:bold; }
+            .stage { position:relative; width:100%; max-width:360px; height:360px; display:flex; align-items:center; justify-content:center; }
+            canvas { position:absolute; width:100%; height:100%; z-index:10; }
+            .toggle-bar { display:flex; gap:10px; width:100%; max-width:320px; z-index:20; }
+            .btn { flex:1; padding:12px; border-radius:14px; border:1px solid #1e293b; background:rgba(15,23,42,0.8); color:#94a3b8; font-weight:bold; font-size:12px; cursor:pointer; text-align:center; transition:all 0.2s; }
+            .btn.active { border-color:#00f2fe; background:rgba(0,242,254,0.2); color:#fff; box-shadow:0 0 15px rgba(0,242,254,0.3); }
+            .footer-text { font-size:11px; color:#64748b; z-index:20; }
+          </style>
+          </head>
+          <body>
+            <div class="header">
+              <span id="aiModelBadge" class="badge">✦ GEMINI 2.5 ACTIVE</span>
+              <span id="aiStateBadge" class="badge" style="border-color:#10b981; color:#10b981;">IDLE READY</span>
+            </div>
+            <div class="stage" id="stageContainer">
+              <canvas id="c" width="360" height="360"></canvas>
+            </div>
+            <div class="toggle-bar">
+              <div id="btnGemini" class="btn active">✦ Gemini</div>
+              <div id="btnClaude" class="btn">✳ Claude</div>
+              <div id="btnPulse" class="btn">⚡ Pulse</div>
+            </div>
+            <div class="footer-text">Nova Apex · Interactive AI Live Wallpaper</div>
+            <script>
+              const c = document.getElementById('c'), ctx = c.getContext('2d');
+              let activeAi = 'gemini', mode = 'idle', rotX = 0.35, rotY = 0.25, pulse = 0;
+              const col = () => activeAi === 'gemini' ? { p:'#00f2fe', s:'#818cf8', g:'rgba(0,242,254,' } : { p:'#f59e0b', s:'#fb923c', g:'rgba(245,158,11,' };
+              
+              function project(x,y,z) {
+                const cy = Math.cos(rotY), sy = Math.sin(rotY);
+                const x1 = x*cy + z*sy, z1 = -x*sy + z*cy;
+                const cx = Math.cos(rotX), sx = Math.sin(rotX);
+                const y2 = y*cx - z1*sx, z2 = y*sx + z1*cx;
+                const fov = 360, s = fov / (fov + z2);
+                return { x: 180 + x1*s, y: 180 + y2*s, s: s };
+              }
+              
+              let angle = 0;
+              function loop() {
+                ctx.clearRect(0,0,360,360);
+                angle += 0.02; rotY += 0.01;
+                const theme = col();
+                
+                [130, 100, 70].forEach((r, idx) => {
+                  ctx.strokeStyle = idx === 0 ? theme.p : idx === 1 ? theme.s : '#fff';
+                  ctx.lineWidth = 2;
+                  ctx.beginPath();
+                  for(let i=0; i<=36; i++) {
+                    const a = (i/36)*Math.PI*2 + (idx%2===0?angle:-angle);
+                    const pt = project(Math.cos(a)*r, Math.sin(a*2)*15*(idx-1), Math.sin(a)*r);
+                    if(i===0) ctx.moveTo(pt.x, pt.y); else ctx.lineTo(pt.x, pt.y);
+                  }
+                  ctx.stroke();
+                });
+                
+                const cp = project(0,0,0);
+                const r = (24 + Math.sin(angle*4)*4) * cp.s;
+                const g = ctx.createRadialGradient(cp.x, cp.y, 2, cp.x, cp.y, r*2.2);
+                g.addColorStop(0, '#fff'); g.addColorStop(0.4, theme.p); g.addColorStop(1, 'transparent');
+                ctx.fillStyle = g;
+                ctx.beginPath(); ctx.arc(cp.x, cp.y, r*2.2, 0, Math.PI*2); ctx.fill();
+                
+                ctx.fillStyle = '#070b14'; ctx.font = 'bold 14px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText(activeAi === 'gemini' ? '✦' : '✳', cp.x, cp.y);
+                
+                if(pulse > 0) {
+                  ctx.strokeStyle = `rgba(255,255,255,${1-pulse})`; ctx.lineWidth = 3;
+                  ctx.beginPath
+                  
