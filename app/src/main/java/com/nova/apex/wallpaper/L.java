@@ -146,7 +146,7 @@ public class L extends Service {
     public int onStartCommand(Intent intent, int flags, int startId) {
         SharedPreferences p = getSharedPreferences(PREFS, MODE_PRIVATE);
         if (intent != null && ACTION_STOP.equals(intent.getAction())) {
-            p.edit().putBoolean("stoppedByUser", true).apply();
+            p.edit().putBoolean("stoppedByUser", true).putBoolean("enabled", false).apply();
             stopSelf();
             return START_NOT_STICKY;
         }
@@ -154,7 +154,9 @@ public class L extends Service {
             if (intent.hasExtra("wake")) wake = intent.getStringExtra("wake");
             listenScreenOff = intent.getBooleanExtra("screenOff", false);
         }
-        p.edit().putBoolean("stoppedByUser", false).apply();
+        // Remember settings so listening can be resumed after an update or restart
+        p.edit().putBoolean("stoppedByUser", false).putBoolean("enabled", true)
+                .putString("wake", wake).putBoolean("screenOff", listenScreenOff).apply();
         try {
             if (Build.VERSION.SDK_INT >= 29) {
                 startForeground(NOTIF_ID, buildNotification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE);
