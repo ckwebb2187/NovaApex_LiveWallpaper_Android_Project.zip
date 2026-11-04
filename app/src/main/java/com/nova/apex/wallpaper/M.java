@@ -45,6 +45,7 @@ import java.util.Iterator;
 
 public class M extends Activity {
     static final String ACTION_TALK = "com.nova.apex.wallpaper.TALK";
+    static final String ACTION_RESUME_LISTEN = "com.nova.apex.wallpaper.RESUME_LISTEN";
     private static final String ACTION_INSTALLED = "com.nova.apex.wallpaper.INSTALL_RESULT";
     private static final int REQ_MIC = 7;
 
@@ -76,6 +77,7 @@ public class M extends Activity {
         v.addJavascriptInterface(new Bridge(), "Android");
         String url = "file:///android_asset/a.html?mode=studio";
         Intent start = getIntent();
+        if (start != null && ACTION_RESUME_LISTEN.equals(start.getAction())) resumeListening();
         if (isTalk(start)) {
             String say = start.getStringExtra("say");
             url += (say != null && !say.isEmpty()) ? "&say=" + Uri.encode(say) : "&listen=1";
@@ -107,6 +109,10 @@ public class M extends Activity {
     protected void onNewIntent(Intent i) {
         super.onNewIntent(i);
         setIntent(i);
+        if (ACTION_RESUME_LISTEN.equals(i.getAction())) {
+            resumeListening();
+            return;
+        }
         if (!isTalk(i)) return;
         if (i.getBooleanExtra("fromVoice", false)) showOverLock(true);
         String say = i.getStringExtra("say");
@@ -189,6 +195,18 @@ public class M extends Activity {
             int f = WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON;
             if (on) getWindow().addFlags(f); else getWindow().clearFlags(f);
         }
+    }
+
+    // From the "Nova stopped listening" notification: restart with the saved settings,
+    // then step back out of the way (Android only allows this while the app is on screen)
+    private void resumeListening() {
+        android.content.SharedPreferences p = getSharedPreferences(L.PREFS, MODE_PRIVATE);
+        bgWake = p.getString("wake", "hey nova");
+        bgScreenOff = p.getBoolean("screenOff", false);
+        startBg();
+        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+            if (L.instance != null) moveTaskToBack(true);
+        }, 900);
     }
 
     // ---- Background listening (wallpaper / home screen / screen off) ----
@@ -448,7 +466,10 @@ public class M extends Activity {
                 bgWake = wake == null || wake.trim().isEmpty() ? "hey nova" : wake;
                 bgScreenOff = screenOff;
                 if (on) startBg();
-                else stopService(new Intent(M.this, L.class));
+                else {
+                    getSharedPreferences(L.PREFS, MODE_PRIVATE).edit().putBoolean("enabled", false).apply();
+                    stopService(new Intent(M.this, L.class));
+                }
             });
         }
 
