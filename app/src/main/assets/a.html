@@ -155,6 +155,15 @@ body.wallpaper #hotkeys,body.wallpaper #askBar{display:none;}
     <div class="sec-label">Layers (mix your own)</div>
     <div class="grid-2" id="layerBtns"></div>
 
+    <div class="sec-label">Falling snow</div>
+    <div class="grid-2">
+      <button class="opt-btn" data-snow="0">Snow off</button>
+      <button class="opt-btn" data-snow="1">Light snow</button>
+      <button class="opt-btn" data-snow="2">Medium snow</button>
+      <button class="opt-btn" data-snow="3">Blizzard</button>
+    </div>
+    <div class="note">Snow stays on when you switch scenes. Say "let it snow" or "snow off", or use the hotkey.</div>
+
     <div class="sec-label">State</div>
     <div class="grid-2" id="stateBtns"></div>
 
@@ -447,11 +456,14 @@ const DEFAULT_COMMANDS = [
   { p: 'hyperdrive', a: 'scene', v: 'hyper', hk: true },
   { p: 'arc reactor', a: 'scene', v: 'reactor', hk: false },
   { p: 'toggle clock', a: 'toggleClock', v: '', hk: false },
+  { p: 'let it snow', a: 'snowOn', v: '', hk: false },
+  { p: 'snow off', a: 'snowOff', v: '', hk: false },
+  { p: 'snow', a: 'toggleSnow', v: '', hk: true },
   { p: 'set wallpaper', a: 'apply', v: '', hk: false }
 ];
 const DEFAULTS = {
   theme: 'cyan', ai: 'gemini', state: 'idle', speed: 1, particles: 120, arcs: 0.35, size: 1,
-  quality: 'balanced', scene: 'neural', layers: Object.assign({}, SCENES.neural.layers)
+  quality: 'balanced', snow: 0, scene: 'neural', layers: Object.assign({}, SCENES.neural.layers)
 };
 const KEY = 'novaApexCfg';
 const KEYS_KEY = 'novaApexKeys';
@@ -474,6 +486,11 @@ function loadCfg() {
   c.voice = Object.assign({}, VOICE_DEFAULTS, c.voice || {});
   c.layers = Object.assign({}, DEFAULTS.layers, c.layers || {});
   if (!Array.isArray(c.commands)) c.commands = DEFAULT_COMMANDS.map(x => Object.assign({}, x));
+  // Add the snow commands once for people who already had saved commands
+  if (!c.snowCmds) {
+    c.snowCmds = true;
+    DEFAULT_COMMANDS.filter(d => /snow/i.test(d.a) && !c.commands.some(x => x.p === d.p)).forEach(d => c.commands.push(Object.assign({}, d)));
+  }
   if (!THEMES[c.theme]) c.theme = DEFAULTS.theme;
   if (!STATES[c.state]) c.state = DEFAULTS.state;
   if (!QUALITY[c.quality]) c.quality = DEFAULTS.quality;
@@ -1044,6 +1061,44 @@ function drawSpectrum(t, cx, cy, R) {
   ctx.globalAlpha = 1;
 }
 
+// ===== Falling snow (independent of scenes) =====
+let flakes = [], snowLevel = -1;
+function buildSnow() {
+  snowLevel = cfg.snow || 0;
+  flakes = [];
+  const n = [0, 50, 110, 220][snowLevel] * (cfg.quality === 'battery' ? 0.6 : 1);
+  for (let i = 0; i < n; i++) flakes.push(newFlake(true));
+}
+function newFlake(anywhere) {
+  const big = Math.random() < 0.3;
+  return {
+    x: Math.random() * W, y: anywhere ? Math.random() * H : -10,
+    r: big ? 2 + Math.random() * 1.8 : 0.8 + Math.random() * 1.2,
+    v: (big ? 0.9 : 0.5) + Math.random() * 0.6, sway: Math.random() * Math.PI * 2, big: big
+  };
+}
+function drawSnow(k) {
+  if (snowLevel !== (cfg.snow || 0)) buildSnow();
+  if (!flakes.length) return;
+  const wind = snowLevel === 3 ? 1.2 : 0.3;
+  ctx.fillStyle = '#ffffff';
+  for (const big of [false, true]) {
+    ctx.globalAlpha = big ? 0.9 : 0.55;
+    ctx.beginPath();
+    for (const f of flakes) {
+      if (f.big !== big) continue;
+      f.sway += 0.02 * k;
+      f.y += f.v * k * (snowLevel === 3 ? 1.8 : 1);
+      f.x += (Math.sin(f.sway) * 0.4 + wind) * k;
+      if (f.y > H + 10 || f.x > W + 10) Object.assign(f, newFlake(false), { x: Math.random() * W * 1.1 - W * 0.1 });
+      ctx.moveTo(f.x + f.r, f.y);
+      ctx.arc(f.x, f.y, f.r, 0, Math.PI * 2);
+    }
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
 function render(dt) {
   const t = th();
   const st = curState();
@@ -1081,6 +1136,7 @@ function render(dt) {
   drawArcs(t, k, cx, cy);
   drawCore(t, cx, cy);
   drawEmp(t, cx, cy, k);
+  drawSnow(dt);
 }
 
 // Frame loop: fps cap from the quality setting, pause switch, and automatic
@@ -1193,7 +1249,7 @@ function applyClockStyle(name) {
 function set(k, v) {
   cfg[k] = v;
   if (k === 'particles') buildParticles();
-  if (k === 'quality') { renderScale = 1; resize(); buildNodes(); buildStars(); buildExtras(); }
+  if (k === 'quality') { renderScale = 1; resize(); buildNodes(); buildStars(); buildExtras(); buildSnow(); }
   saveCfg(); updateUI();
 }
 
@@ -1231,6 +1287,7 @@ function updateUI() {
   act('[data-scene]', b => b.dataset.scene === cfg.scene);
   act('[data-layer]', b => !!cfg.layers[b.dataset.layer]);
   act('[data-quality]', b => b.dataset.quality === cfg.quality);
+  act('[data-snow]', b => +b.dataset.snow === (cfg.snow || 0));
   act('[data-vt]', b => !!cfg.voice[b.dataset.vt]);
   [['Speed', 'speed', 'x'], ['Particles', 'particles', ''], ['Arcs', 'arcs', ''], ['Size', 'size', 'x']].forEach(([id, k, u]) => {
     $('rng' + id).value = cfg[k];
@@ -1283,6 +1340,7 @@ function buildUI() {
   STATE_KEYS.forEach(k => makeBtn($('stateBtns'), STATES[k].label, { state: k }, () => set('state', k)));
   document.querySelectorAll('[data-ai]').forEach(b => b.onclick = () => set('ai', b.dataset.ai));
   document.querySelectorAll('[data-quality]').forEach(b => b.onclick = () => set('quality', b.dataset.quality));
+  document.querySelectorAll('[data-snow]').forEach(b => b.onclick = () => set('snow', +b.dataset.snow));
   [['Speed', 'speed'], ['Particles', 'particles'], ['Arcs', 'arcs'], ['Size', 'size']].forEach(([id, k]) => {
     $('rng' + id).oninput = e => set(k, parseFloat(e.target.value));
   });
@@ -1403,6 +1461,9 @@ const ACTIONS = {
   scene:       { label: 'Set scene', arg: () => SCENE_KEYS },
   state:       { label: 'Set state', arg: () => STATE_KEYS },
   toggleClock: { label: 'Clock on/off' },
+  toggleSnow:  { label: 'Snow on/off' },
+  snowOn:      { label: 'Snow on' },
+  snowOff:     { label: 'Snow off' },
   ask:         { label: 'Ask AI a set question', arg: 'text' },
   speak:       { label: 'Say something', arg: 'text' },
   apply:       { label: 'Set as wallpaper' }
@@ -1426,6 +1487,9 @@ function runAction(a, v, quiet) {
     }
     case 'scene': if (SCENES[v]) { setScene(v); msg = SCENES[v].label + ' engaged.'; } break;
     case 'state': if (STATES[v]) { set('state', v); msg = 'State ' + v + '.'; } break;
+    case 'toggleSnow': set('snow', cfg.snow ? 0 : 2); msg = cfg.snow ? 'Let it snow.' : 'Snow off.'; break;
+    case 'snowOn': set('snow', cfg.snow || 2); msg = 'Let it snow.'; break;
+    case 'snowOff': set('snow', 0); msg = 'Snow off.'; break;
     case 'toggleClock': setClock('on', !cfg.clock.on); msg = 'Clock ' + (cfg.clock.on ? 'on.' : 'off.'); break;
     case 'ask': askAI(v || 'Hello'); return '';
     case 'speak': msg = v; break;
@@ -1925,12 +1989,13 @@ window.syncConfig = function () {
   updateUI();
 };
 
-window.addEventListener('resize', () => { resize(); buildParticles(); buildExtras(); });
+window.addEventListener('resize', () => { resize(); buildParticles(); buildExtras(); buildSnow(); });
 resize();
 buildNodes();
 buildParticles();
 buildStars();
 buildExtras();
+buildSnow();
 if (!isWall) buildUI();
 updateUI();
 if (!isAgent) {
