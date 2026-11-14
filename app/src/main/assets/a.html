@@ -166,6 +166,8 @@ body.wallpaper #hotkeys,body.wallpaper #askBar{display:none;}
       <button class="opt-btn" data-face="1">Show face</button>
       <button class="opt-btn" data-face="0">No face</button>
     </div>
+    <div class="sec-label">Eye style</div>
+    <div class="grid-3" id="eyeBtns"></div>
     <div class="note">Quirky Nova hops, wobbles, sneezes, gets dizzy, dozes off when ignored, and can't resist watching every button you press.</div>
 
     <div class="sec-label">Touch effect</div>
@@ -544,7 +546,7 @@ const DEFAULT_COMMANDS = [
 ];
 const DEFAULTS = {
   theme: 'cyan', ai: 'gemini', state: 'idle', speed: 1, particles: 120, arcs: 0.35, size: 1,
-  quality: 'balanced', camera: 'drift', persona: 'quirky', face: true, touch: 'random', snow: 0, scene: 'neural', layers: Object.assign({}, SCENES.neural.layers)
+  quality: 'balanced', camera: 'drift', persona: 'quirky', face: true, eyes: 'capsule', touch: 'random', snow: 0, scene: 'neural', layers: Object.assign({}, SCENES.neural.layers)
 };
 const KEY = 'novaApexCfg';
 const KEYS_KEY = 'novaApexKeys';
@@ -901,6 +903,7 @@ function sparkBurst(x, y, n, speed) {
 // ===== Personality: a quirky little character living in the core =====
 const pers = {
   dx: 0, dy: 0, s: 1, q: 0, vq: 0, hop: 0, vhop: 0, rot: 0, vrot: 0,
+  wx: 0, wy: 0, twx: 0, twy: 0, tilt: 0, ttilt: 0, z: 0, vz: 0, lastAct: '', a: null,
   ex: 0, ey: 0, tex: 0, tey: 0, blink: 0, nextBlink: 2, mood: 'normal', moodT: 0,
   idle: 0, nextAct: 4, act: null, actT: 0, step: 0, excite: 0, clicks: [], emotes: [], motes: [], peekX: 0
 };
@@ -957,6 +960,10 @@ function updatePersona(dt, R) {
     if (Math.abs(pers.vrot) > 0.002 || Math.abs(target - pers.rot) > 0.5) { /* settling */ }
   } else if (Math.abs(pers.vrot) > 0.15 && pers.mood !== 'happy') setMood('dizzy', 1.6);
 
+  pers.wx += (pers.twx - pers.wx) * 0.07 * k; pers.wy += (pers.twy - pers.wy) * 0.07 * k;
+  pers.tilt += (pers.ttilt - pers.tilt) * 0.1 * k;
+  pers.vz += (-pers.z * 0.16 - pers.vz * 0.12) * k; pers.z += pers.vz * k;
+
   // peek up above the settings drawer to watch the buttons
   const open = document.body.classList.contains('drawer-open');
   const tdy = open ? -(H / 2 - H * 0.105) : 0, ts = open ? 0.42 : 1;
@@ -975,7 +982,7 @@ function updatePersona(dt, R) {
 
   // floating emotes and absorbed sparkles
   pers.emotes = pers.emotes.filter(e => { e.y -= 0.9 * k; e.life -= 0.012 * k; return e.life > 0; });
-  const coreX = camX + lean.x + pers.dx, coreY = camY + lean.y + pers.dy - pers.hop;
+  const coreX = camX + lean.x + pers.dx + pers.wx, coreY = camY + lean.y + pers.dy + pers.wy - pers.hop;
   pers.motes = pers.motes.filter(m => {
     const ddx = coreX - m.x, ddy = coreY - m.y, d = Math.hypot(ddx, ddy);
     m.vx += ddx / (d + 1) * 1.1 * k; m.vy += ddy / (d + 1) * 1.1 * k;
@@ -994,8 +1001,8 @@ function updatePersona(dt, R) {
 
   // idle life: little habits every few seconds
   pers.idle += 0.016 * k;
-  if (st !== 'idle') { pers.idle = 0; if (pers.mood === 'sleep') pers.mood = 'normal'; return; }
-  if (quirky() && pers.idle > 75 && pers.mood !== 'sleep') { setMood('sleep', 0); pers.act = null; }
+  if (st !== 'idle') { pers.idle = 0; if (pers.mood === 'sleep') pers.mood = 'normal'; if (pers.act) endAct(); return; }
+  if (quirky() && pers.idle > rnd(60, 90) && pers.mood !== 'sleep') { setMood('sleep', 0); if (pers.act) endAct(); }
   if (pers.mood === 'sleep') {
     pers.tex = 0; pers.tey = 0.3;
     if (Math.random() < 0.01 * k) emote('z');
@@ -1004,92 +1011,235 @@ function updatePersona(dt, R) {
   }
   if (pers.act) {
     pers.actT += 0.016 * k;
-    if (pers.act === 'dance' && pers.actT > pers.step * 0.42 && pers.step < 6) { pers.step++; hop(4.5); pers.vrot += (pers.step % 2 ? 0.05 : -0.05); if (pers.step === 1) emote('♪'); }
-    if (pers.act === 'look' && pers.actT > pers.step * 0.6 && pers.step < 4) { pers.step++; pers.tex = Math.random() * 2 - 1; pers.tey = Math.random() * 1.4 - 0.7; }
-    if (pers.act === 'sneeze' && pers.step === 0 && pers.actT > 0.7) {
-      pers.step = 1; pers.vq -= 0.35; pers.dx += (Math.random() - 0.5) * 30; setMood('normal', 0);
-      sparkBurst(coreX, coreY, 30, 4); emote('✦');
-    }
-    if (pers.actT > 2.6) { pers.act = null; pers.tex = 0; pers.tey = 0; pers.peekX = 0; }
+    const A = ACTS[pers.act];
+    if (A.tick) A.tick(pers.a, pers.actT, coreX, coreY, R);
+    if (pers.actT > pers.a.dur) endAct();
     return;
   }
   pers.nextAct -= 0.016 * k;
   if (pers.nextAct > 0) return;
-  pers.nextAct = quirky() ? 4 + Math.random() * 6 : 8 + Math.random() * 8;
-  const acts = quirky() ? ['hop', 'wobble', 'spin', 'peek', 'sneeze', 'look', 'look', 'dance', 'yawn'] : ['look', 'look', 'wobble'];
-  const a = acts[(Math.random() * acts.length) | 0];
-  pers.act = a; pers.actT = 0; pers.step = 0;
-  if (a === 'hop') { hop(7); pers.act = null; }
-  else if (a === 'wobble') { pers.vq += quirky() ? 0.35 : 0.12; pers.act = null; }
-  else if (a === 'spin') { pers.vrot = 0.45; }
-  else if (a === 'peek') { pers.peekX = (Math.random() < 0.5 ? -1 : 1) * R * 0.7; pers.tex = pers.peekX > 0 ? 1 : -1; pers.tey = 0; }
-  else if (a === 'sneeze') { setMood('scrunch', 0.7); pers.vq -= 0.1; }
-  else if (a === 'yawn') { setMood('sleepy', 2.2); pers.vq -= 0.25; emote('~'); }
+  startAct(R);
+}
+
+// ---- Quirky gestures: each one gets random strength, direction and length ----
+const rnd = (a, b) => a + Math.random() * (b - a);
+const sgn = () => (Math.random() < 0.5 ? -1 : 1);
+const pick = arr => arr[(Math.random() * arr.length) | 0];
+
+const ACTS = {
+  hop:       { start: a => { hop(rnd(4, 11)); a.dur = 0.8; } },
+  wobble:    { start: a => { pers.vq += rnd(0.2, 0.5) * sgn(); a.dur = 0.6; } },
+  spin:      { start: a => { pers.vrot = rnd(0.25, 0.7) * sgn(); a.dur = rnd(1.5, 2.5); } },
+  backflip:  { start: a => { hop(rnd(9, 12)); pers.vrot = rnd(0.45, 0.6) * sgn(); a.dur = 1.6; } },
+  peek:      { start: (a, R) => { pers.peekX = sgn() * R * rnd(0.4, 0.9); pers.tex = Math.sign(pers.peekX); pers.tey = rnd(-0.3, 0.3); a.dur = rnd(1.2, 2.6); } },
+  sneeze:    { start: a => { setMood('scrunch', 0.7); pers.vq -= 0.1; a.dur = 1.4; a.done = false; },
+               tick: (a, tt, x, y) => { if (!a.done && tt > rnd(0.55, 0.9)) { a.done = true; pers.vq -= rnd(0.25, 0.45); pers.twx = sgn() * rnd(8, 30); setMood('normal', 0); sparkBurst(x, y, (rnd(15, 45)) | 0, rnd(3, 5)); emote(pick(['✦', '!', '*'])); } } },
+  look:      { start: a => { a.dur = rnd(1.5, 3.5); a.next = 0; },
+               tick: (a, tt) => { if (tt > a.next) { a.next = tt + rnd(0.3, 0.9); pers.tex = rnd(-1, 1); pers.tey = rnd(-0.8, 0.8); } } },
+  dance:     { start: a => { a.dur = rnd(1.8, 3.2); a.beat = rnd(0.3, 0.5); a.n = 0; emote('♪'); },
+               tick: (a, tt) => { if (tt > a.n * a.beat) { a.n++; hop(rnd(3, 6)); pers.vrot += (a.n % 2 ? 0.06 : -0.06); pers.twx = (a.n % 2 ? 1 : -1) * rnd(5, 15); if (Math.random() < 0.25) emote(pick(['♪', '♫'])); } } },
+  yawn:      { start: a => { setMood('sleepy', rnd(1.5, 2.6)); pers.vq -= rnd(0.2, 0.35); emote('~'); a.dur = 2.4; } },
+  shiver:    { start: a => { a.dur = rnd(0.6, 1.2); if (Math.random() < 0.5) emote('!'); },
+               tick: () => { pers.wx = rnd(-4, 4); pers.wy = rnd(-2, 2); } },
+  stretch:   { start: a => { pers.vq -= rnd(0.3, 0.45); a.dur = 1.2; a.done = false; },
+               tick: (a, tt) => { if (!a.done && tt > 0.5) { a.done = true; pers.vq += rnd(0.4, 0.55); } } },
+  wander:    { start: a => { pers.twx = rnd(-W * 0.22, W * 0.22); pers.twy = rnd(-H * 0.1, H * 0.1); pers.tex = Math.sign(pers.twx); a.dur = rnd(2, 4.5); } },
+  doubletake:{ start: a => { a.dur = 1.6; a.side = sgn(); pers.tex = a.side; },
+               tick: (a, tt) => { if (tt > 0.45 && tt < 0.7) pers.tex = 0; else if (tt >= 0.7 && tt < 0.75) { pers.tex = a.side; setMood('surprised', 0.7); pers.vq += 0.15; emote('!'); } } },
+  giggle:    { start: a => { a.dur = rnd(0.8, 1.6); setMood('happy', a.dur); emote(pick(['☺', '♪', '♥'])); },
+               tick: (a, tt) => { pers.vq += Math.sin(tt * 40) * 0.025; } },
+  roll:      { start: a => { a.dir = sgn(); pers.vrot = 0.5 * a.dir; pers.twx = a.dir * rnd(W * 0.1, W * 0.25); a.dur = rnd(1.2, 2); } },
+  zoompop:   { start: a => { pers.vz += rnd(0.25, 0.5); if (Math.random() < 0.6) emote('✦'); a.dur = 0.9; } },
+  tilt:      { start: a => { pers.ttilt = sgn() * rnd(0.2, 0.45); pers.tey = -0.6; pers.tex = -pers.ttilt; if (Math.random() < 0.6) emote('?'); a.dur = rnd(1.2, 2.4); } },
+  orbitdash: { start: (a, R) => { a.dur = rnd(1, 1.8); a.r = R * rnd(0.3, 0.6); a.dir = sgn(); },
+               tick: (a, tt) => { const f = tt / a.dur * Math.PI * 2 * a.dir; pers.twx = Math.sin(f) * a.r; pers.twy = (1 - Math.cos(f)) * -a.r * 0.4; pers.tex = Math.cos(f) * a.dir; } },
+  hiccup:    { start: a => { a.dur = rnd(1.5, 2.5); a.times = [rnd(0.1, 0.4), rnd(0.7, 1.1), rnd(1.2, 1.5)]; a.i = 0; },
+               tick: (a, tt) => { if (a.i < 3 && tt > a.times[a.i]) { a.i++; hop(rnd(2.5, 4.5)); pers.vq += 0.1; if (Math.random() < 0.5) emote('!'); } } },
+  nod:       { start: a => { a.dur = rnd(0.9, 1.4); },
+               tick: (a, tt) => { pers.twy = Math.sin(tt * 14) * 6; } },
+  shake:     { start: a => { a.dur = rnd(0.8, 1.3); },
+               tick: (a, tt) => { pers.twx = Math.sin(tt * 18) * 9; pers.tex = Math.sin(tt * 18); } },
+  sigh:      { start: a => { setMood('sleepy', 1.4); pers.twy = 8; pers.vq += 0.2; emote('~'); a.dur = 1.6; } },
+  boing:     { start: a => { a.dur = rnd(1.6, 2.6); a.n = 0; },
+               tick: (a, tt) => { if (pers.hop <= 0.01 && a.n < 5) { a.n++; hop(Math.max(2, 10 - a.n * 1.8)); } } },
+  scan:      { start: a => { a.dur = rnd(1.5, 2.5); emote('◎'); },
+               tick: (a, tt) => { pers.tex = Math.sin(tt * 4); pers.tey = Math.cos(tt * 2.5) * 0.4; } }
+};
+const QUIRKY_ACTS = Object.keys(ACTS);
+const CALM_ACTS = ['look', 'look', 'wobble', 'tilt', 'scan', 'nod'];
+
+function startAct(R) {
+  const list = quirky() ? QUIRKY_ACTS : CALM_ACTS;
+  let name = pick(list);
+  if (name === pers.lastAct) name = pick(list);   // rarely repeat the same thing
+  pers.lastAct = name;
+  pers.act = name; pers.actT = 0;
+  pers.a = { dur: 1 };
+  ACTS[name].start(pers.a, R);
+  // unpredictable pacing: mostly short gaps, sometimes long quiet spells
+  pers.nextAct = quirky() ? (Math.random() < 0.15 ? rnd(8, 14) : rnd(1.5, 6)) : rnd(6, 14);
+  pers.chain = quirky() && Math.random() < 0.3;    // sometimes chain straight into another
+}
+
+function endAct() {
+  pers.act = null;
+  pers.twx = 0; pers.twy = 0; pers.ttilt = 0; pers.wx = 0; pers.wy = 0;
+  pers.tex = 0; pers.tey = 0; pers.peekX = 0;
+  if (pers.chain) { pers.chain = false; pers.nextAct = rnd(0, 0.4); }
 }
 
 // Wraps a core-centered drawing in Nova's current hop / squash / spin / peek
 function personaWrap(cx, cy, fn) {
   if (!persOn() && !document.body.classList.contains('drawer-open')) { fn(); return; }
   ctx.save();
-  ctx.translate(cx + pers.dx, cy + pers.dy - pers.hop);
-  ctx.rotate(pers.rot);
-  ctx.scale(pers.s * (1 + pers.q), pers.s * (1 - pers.q));
+  ctx.translate(cx + pers.dx + pers.wx, cy + pers.dy + pers.wy - pers.hop);
+  ctx.rotate(pers.rot + pers.tilt);
+  const zz = 1 + pers.z;
+  ctx.scale(pers.s * zz * (1 + pers.q), pers.s * zz * (1 - pers.q));
   ctx.translate(-cx, -cy);
   fn();
   ctx.restore();
 }
 
+const EYE_STYLES = {
+  capsule: 'Capsule', round: 'Round', anime: 'Anime', cat: 'Cat', ring: 'Halo ring', star: 'Star',
+  heart: 'Heart', diamond: 'Diamond', pixel: 'Pixel', hud: 'HUD lens', visor: 'Visor', cyclops: 'Cyclops'
+};
+
+// Outline of one open eye, centered at (x, y); open = 0..1 (blinking)
+function eyePath(style, x, y, w, h, open) {
+  const p = new Path2D();
+  const oh = Math.max(0.12, open);
+  const rr = (rx, ry, rw, rh, r) => {
+    r = Math.min(r, rw / 2, rh / 2);
+    p.moveTo(rx + r, ry); p.lineTo(rx + rw - r, ry); p.arc(rx + rw - r, ry + r, r, -Math.PI / 2, 0);
+    p.lineTo(rx + rw, ry + rh - r); p.arc(rx + rw - r, ry + rh - r, r, 0, Math.PI / 2);
+    p.lineTo(rx + r, ry + rh); p.arc(rx + r, ry + rh - r, r, Math.PI / 2, Math.PI);
+    p.lineTo(rx, ry + r); p.arc(rx + r, ry + r, r, Math.PI, Math.PI * 1.5); p.closePath();
+  };
+  if (style === 'capsule') { const eh = h * oh; rr(x - w / 2, y - eh / 2, w, eh, w / 2); }
+  else if (style === 'round' || style === 'ring' || style === 'hud' || style === 'cyclops') p.ellipse(x, y, w * 0.95, w * 0.95 * oh, 0, 0, Math.PI * 2);
+  else if (style === 'anime') p.ellipse(x, y, w * 0.85, h * 0.62 * oh, 0, 0, Math.PI * 2);
+  else if (style === 'cat') { p.moveTo(x - w * 1.15, y); p.quadraticCurveTo(x, y - h * 0.75 * oh, x + w * 1.15, y); p.quadraticCurveTo(x, y + h * 0.75 * oh, x - w * 1.15, y); p.closePath(); }
+  else if (style === 'star') {
+    for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, r = (i % 2 ? 0.45 : 1.15) * w; i ? p.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r * oh) : p.moveTo(x + Math.cos(a) * r, y + Math.sin(a) * r * oh); }
+    p.closePath();
+  }
+  else if (style === 'heart') {
+    const s2 = w * 1.15, top = y - s2 * 0.35 * oh;
+    p.moveTo(x, y + s2 * 0.75 * oh);
+    p.bezierCurveTo(x - s2 * 1.3, top + s2 * 0.1 * oh, x - s2 * 0.6, top - s2 * 0.8 * oh, x, top);
+    p.bezierCurveTo(x + s2 * 0.6, top - s2 * 0.8 * oh, x + s2 * 1.3, top + s2 * 0.1 * oh, x, y + s2 * 0.75 * oh);
+    p.closePath();
+  }
+  else if (style === 'diamond') { p.moveTo(x, y - h * 0.6 * oh); p.lineTo(x + w * 0.9, y); p.lineTo(x, y + h * 0.6 * oh); p.lineTo(x - w * 0.9, y); p.closePath(); }
+  else if (style === 'pixel') { const s2 = w * 1.6, eh = s2 * oh; p.rect(x - s2 / 2, y - eh / 2, s2, eh); }
+  else if (style === 'visor') { const eh = h * 0.4 * oh; rr(x - w / 2, y - eh / 2, w, eh, eh / 2); }
+  return p;
+}
+
+// Translucent glass eye with a strong neon glow
+function glassEye(t, path, x, y, w, glow, size) {
+  // faint shadow so the eye reads on the bright core
+  ctx.lineWidth = 3; ctx.strokeStyle = '#060913'; ctx.globalAlpha = 0.28; ctx.shadowBlur = 0;
+  ctx.stroke(path);
+  // outer neon halo
+  ctx.shadowColor = t.a; ctx.shadowBlur = 26 * size * glow;
+  ctx.fillStyle = t.a; ctx.globalAlpha = 0.38;
+  ctx.fill(path);
+  ctx.shadowBlur = 12 * size * glow; ctx.fill(path);
+  ctx.shadowBlur = 0;
+  // see-through body, bright in the middle
+  const g = ctx.createRadialGradient(x - w * 0.2, y - w * 0.25, 0, x, y, w * 1.8);
+  g.addColorStop(0, 'rgba(255,255,255,0.85)');
+  g.addColorStop(0.35, t.a + 'aa');
+  g.addColorStop(1, t.a + '33');
+  ctx.fillStyle = g; ctx.globalAlpha = 0.75;
+  ctx.fill(path);
+  // bright rim
+  ctx.strokeStyle = t.a; ctx.lineWidth = 1.6; ctx.globalAlpha = 0.95;
+  ctx.shadowColor = t.a; ctx.shadowBlur = 8 * glow;
+  ctx.stroke(path);
+  ctx.shadowBlur = 0;
+}
+
+function glowStroke(t, draw, lw, glow, size) {
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.strokeStyle = '#060913'; ctx.globalAlpha = 0.25; ctx.lineWidth = lw + 3; ctx.beginPath(); draw(); ctx.stroke();
+  ctx.strokeStyle = t.a; ctx.shadowColor = t.a; ctx.shadowBlur = 22 * size * glow;
+  ctx.globalAlpha = 0.55; ctx.lineWidth = lw * 1.6; ctx.beginPath(); draw(); ctx.stroke();
+  ctx.shadowBlur = 8 * glow; ctx.strokeStyle = '#ffffff'; ctx.globalAlpha = 0.8; ctx.lineWidth = lw * 0.55; ctx.beginPath(); draw(); ctx.stroke();
+  ctx.shadowBlur = 0;
+}
+
 function drawFace(t, cx, cy) {
   if (!persOn() || cfg.face === false) return;
+  const style = cfg.eyes || 'capsule';
   const r0 = (26 + Math.sin(phase * 3) * 5 + level * 14) * cfg.size;
-  const gap = r0 * 0.34, w = r0 * 0.17, h = r0 * 0.46;
+  const gap = r0 * 0.42, w = r0 * 0.23, h = r0 * 0.6;
   const ox = pers.ex * r0 * 0.28, oy = pers.ey * r0 * 0.22;
+  const y = cy - r0 * 0.05 + oy;
   const m = pers.mood;
-  const glow = 0.75 + Math.sin(clock * 2.2) * 0.25;   // eyes softly pulse
-  ctx.lineCap = 'round';
-  // pass 1: dark outline so the eyes read on the bright core; pass 2: glowing neon eyes
-  [['#060913', 0.6, 1.9, 0], [t.a, 1, 1, 14 * cfg.size * glow]].forEach(([col, alpha, thick, blur]) => {
-    ctx.fillStyle = col; ctx.strokeStyle = col; ctx.globalAlpha = alpha;
-    ctx.shadowColor = t.a; ctx.shadowBlur = blur;
-    const lw = Math.max(2, w * 0.7) * thick;
-    ctx.lineWidth = lw;
-    for (const side of [-1, 1]) {
-      const y = cy - r0 * 0.05 + oy;
-      const ex = cx + side * gap + ox;
-      ctx.beginPath();
-      if (m === 'happy') { ctx.arc(ex, y + h * 0.15, w * 1.1, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke(); }
-      else if (m === 'sleep' || m === 'sleepy') { ctx.moveTo(ex - w, y + (m === 'sleepy' ? h * 0.1 : 0)); ctx.lineTo(ex + w, y); ctx.stroke(); }
-      else if (m === 'dizzy') {
-        const sp = clock * 8 * side;
-        for (let j = 0; j < 10; j++) { const a = sp + j * 0.7, rr = j * w * 0.12; j ? ctx.lineTo(ex + Math.cos(a) * rr, y + Math.sin(a) * rr) : ctx.moveTo(ex, y); }
-        ctx.lineWidth = Math.max(1.5, w * 0.35) * thick; ctx.stroke(); ctx.lineWidth = lw;
-      }
-      else if (m === 'scrunch') { ctx.moveTo(ex - w * side, y - w); ctx.lineTo(ex + w * side * 0.6, y); ctx.lineTo(ex - w * side, y + w); ctx.stroke(); }
-      else if (m === 'surprised') { ctx.arc(ex, y, w * 1.05 * (thick > 1 ? 1.35 : 1), 0, Math.PI * 2); ctx.fill(); }
-      else {
-        const grow = thick > 1 ? 1.45 : 1;
-        const ew = w * grow, eh = Math.max(ew * 0.25, h * (thick > 1 ? 1.12 : 1) * (1 - Math.sin(pers.blink * Math.PI)));
-        const top = y - eh / 2, rr = ew / 2;
-        ctx.moveTo(ex - rr, top + rr);
-        ctx.arc(ex, top + rr, rr, Math.PI, 0);
-        ctx.lineTo(ex + rr, top + eh - rr);
-        ctx.arc(ex, top + eh - rr, rr, 0, Math.PI);
-        ctx.closePath(); ctx.fill();
-      }
+  const glow = 0.8 + Math.sin(clock * 2.2) * 0.2;
+  const open = 1 - Math.sin(pers.blink * Math.PI);
+  const lw = Math.max(2.2, w * 0.6);
+  const sides = style === 'cyclops' ? [0] : [-1, 1];
+
+  // mood shapes (shared by every style)
+  if (m === 'happy' || m === 'sleep' || m === 'sleepy' || m === 'dizzy' || m === 'scrunch') {
+    for (const side of sides) {
+      const ex = cx + side * gap * (style === 'visor' ? 0.8 : 1) + ox, ww = style === 'cyclops' ? w * 1.6 : w;
+      glowStroke(t, () => {
+        if (m === 'happy') ctx.arc(ex, y + h * 0.15, ww * 1.1, Math.PI * 1.1, Math.PI * 1.9);
+        else if (m === 'sleep' || m === 'sleepy') { ctx.moveTo(ex - ww, y + (m === 'sleepy' ? h * 0.1 : 0)); ctx.lineTo(ex + ww, y); }
+        else if (m === 'dizzy') { const sp = clock * 8 * (side || 1); for (let j = 0; j < 12; j++) { const a = sp + j * 0.7, rr = j * ww * 0.11; j ? ctx.lineTo(ex + Math.cos(a) * rr, y + Math.sin(a) * rr) : ctx.moveTo(ex, y); } }
+        else { const sd = side || 1; ctx.moveTo(ex - ww * sd, y - ww); ctx.lineTo(ex + ww * sd * 0.6, y); ctx.lineTo(ex - ww * sd, y + ww); }
+      }, m === 'dizzy' ? lw * 0.6 : lw, glow, cfg.size);
     }
-  });
-  // a little sparkle in each open eye
-  ctx.shadowBlur = 0;
-  if (m === 'normal' || m === 'surprised') {
-    ctx.fillStyle = '#ffffff'; ctx.globalAlpha = 0.9 * (1 - Math.sin(pers.blink * Math.PI));
-    ctx.beginPath();
-    for (const side of [-1, 1]) {
-      const ex = cx + side * gap + ox + w * 0.18, y = cy - r0 * 0.05 + oy - h * 0.18;
-      ctx.moveTo(ex + w * 0.22, y); ctx.arc(ex, y, w * 0.22, 0, Math.PI * 2);
-    }
-    ctx.fill();
+    ctx.globalAlpha = 1; ctx.lineCap = 'butt';
+    return;
   }
-  ctx.globalAlpha = 1; ctx.lineCap = 'butt';
+
+  const big = m === 'surprised' ? 1.3 : 1;
+  if (style === 'visor') {
+    const vw = (gap * 2 + w * 2.2) * big;
+    glassEye(t, eyePath('visor', cx + ox * 0.6, y, vw, h, open), cx + ox * 0.6, y, w * 2.5, glow, cfg.size);
+    // a scanning light runs along the visor
+    if (open > 0.4) {
+      const sx = cx + ox * 0.6 + Math.sin(clock * 2.4) * vw * 0.4;
+      ctx.fillStyle = '#ffffff'; ctx.globalAlpha = 0.9; ctx.shadowColor = t.a; ctx.shadowBlur = 14;
+      ctx.beginPath(); ctx.ellipse(sx, y, w * 0.5, h * 0.13, 0, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0;
+    }
+  } else {
+    for (const side of sides) {
+      const ex = cx + side * gap + ox;
+      const ew = (style === 'cyclops' ? w * 1.9 : w) * big, eh = (style === 'cyclops' ? h * 1.4 : h) * big;
+      const path = eyePath(style === 'cyclops' ? 'round' : style, ex, y, ew, eh, open);
+      glassEye(t, path, ex, y, ew, glow, cfg.size);
+      if (open < 0.35) continue;
+      // inner details
+      const px = ex + pers.ex * ew * 0.35, py = y + pers.ey * ew * 0.3;
+      ctx.fillStyle = '#060913'; ctx.globalAlpha = 0.55;
+      if (style === 'cat') { ctx.beginPath(); ctx.ellipse(px, py, ew * 0.18, eh * 0.32 * open, 0, 0, Math.PI * 2); ctx.fill(); }
+      else if (style === 'anime' || style === 'round' || style === 'cyclops') { ctx.beginPath(); ctx.arc(px, py, ew * (style === 'anime' ? 0.45 : 0.4), 0, Math.PI * 2); ctx.fill(); }
+      else if (style === 'ring') { ctx.globalAlpha = 0.8; ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(px, py, ew * 0.38, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#060913'; ctx.globalAlpha = 0.4; ctx.beginPath(); ctx.arc(px, py, ew * 0.2, 0, Math.PI * 2); ctx.fill(); }
+      else if (style === 'hud') {
+        ctx.strokeStyle = '#ffffff'; ctx.globalAlpha = 0.85; ctx.lineWidth = 1.2;
+        ctx.beginPath(); ctx.arc(px, py, ew * 0.45, 0, Math.PI * 2);
+        ctx.moveTo(px - ew * 0.75, py); ctx.lineTo(px - ew * 0.2, py); ctx.moveTo(px + ew * 0.2, py); ctx.lineTo(px + ew * 0.75, py);
+        ctx.moveTo(px, py - ew * 0.75); ctx.lineTo(px, py - ew * 0.2); ctx.moveTo(px, py + ew * 0.2); ctx.lineTo(px, py + ew * 0.75);
+        ctx.stroke();
+      }
+      // glints
+      ctx.fillStyle = '#ffffff'; ctx.globalAlpha = 0.95 * open;
+      ctx.beginPath();
+      const hx = ex + ew * 0.22, hy = y - eh * 0.2 * (style === 'capsule' || style === 'anime' ? 1 : 0.6);
+      ctx.moveTo(hx + ew * 0.22, hy); ctx.arc(hx, hy, ew * 0.22, 0, Math.PI * 2);
+      if (style === 'anime' || style === 'cyclops') { ctx.moveTo(ex - ew * 0.2 + ew * 0.1, y + eh * 0.15); ctx.arc(ex - ew * 0.2, y + eh * 0.15, ew * 0.1, 0, Math.PI * 2); }
+      ctx.fill();
+    }
+  }
+  ctx.globalAlpha = 1; ctx.lineCap = 'butt'; ctx.lineJoin = 'miter';
 }
 
 // While idle Nova breathes a soft aura and has little glints orbiting it
@@ -1115,7 +1265,7 @@ function drawIdleGlow(t, cx, cy) {
 
 function drawPersonaFx(t) {
   if (!pers.emotes.length && !pers.motes.length) return;
-  const coreX = camX + lean.x + pers.dx, coreY = camY + lean.y + pers.dy - pers.hop;
+  const coreX = camX + lean.x + pers.dx + pers.wx, coreY = camY + lean.y + pers.dy + pers.wy - pers.hop;
   const r0 = (30 + level * 14) * cfg.size * pers.s;
   ctx.font = 'bold ' + Math.round(20 * Math.max(0.7, pers.s)) + 'px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   for (const e of pers.emotes) {
@@ -2438,6 +2588,7 @@ function updateUI() {
   act('[data-touch]', b => b.dataset.touch === (cfg.touch || 'random'));
   act('[data-persona]', b => b.dataset.persona === (cfg.persona || 'quirky'));
   act('[data-face]', b => (b.dataset.face === '1') === (cfg.face !== false));
+  act('[data-eyes]', b => b.dataset.eyes === (cfg.eyes || 'capsule'));
   act('[data-vt]', b => !!cfg.voice[b.dataset.vt]);
   [['Speed', 'speed', 'x'], ['Particles', 'particles', ''], ['Arcs', 'arcs', ''], ['Size', 'size', 'x']].forEach(([id, k, u]) => {
     $('rng' + id).value = cfg[k];
@@ -2506,6 +2657,7 @@ function buildUI() {
   document.querySelectorAll('[data-touch]').forEach(b => b.onclick = () => set('touch', b.dataset.touch));
   document.querySelectorAll('[data-persona]').forEach(b => b.onclick = () => set('persona', b.dataset.persona));
   document.querySelectorAll('[data-face]').forEach(b => b.onclick = () => set('face', b.dataset.face === '1'));
+  Object.keys(EYE_STYLES).forEach(k => makeBtn($('eyeBtns'), EYE_STYLES[k], { eyes: k }, () => { set('face', true); set('eyes', k); setMood('surprised', 0.6); }));
   [['Speed', 'speed'], ['Particles', 'particles'], ['Arcs', 'arcs'], ['Size', 'size']].forEach(([id, k]) => {
     $('rng' + id).oninput = e => set(k, parseFloat(e.target.value));
   });
