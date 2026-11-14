@@ -155,6 +155,18 @@ body.wallpaper #hotkeys,body.wallpaper #askBar{display:none;}
     <div class="sec-label">Layers (mix your own)</div>
     <div class="grid-2" id="layerBtns"></div>
 
+    <div class="sec-label">Touch effect</div>
+    <div class="grid-3">
+      <button class="opt-btn" data-touch="burst">Spark burst</button>
+      <button class="opt-btn" data-touch="bolt">Energy bolt</button>
+      <button class="opt-btn" data-touch="vortex">Vortex</button>
+      <button class="opt-btn" data-touch="ripple">Ripple</button>
+      <button class="opt-btn" data-touch="shock">Shockwave</button>
+      <button class="opt-btn" data-touch="random">Random</button>
+      <button class="opt-btn" data-touch="pulse">Classic pulse</button>
+    </div>
+    <div class="note">Tap anywhere to trigger it. Drag your finger to leave a light trail; the core leans toward your touch.</div>
+
     <div class="sec-label">Falling snow</div>
     <div class="grid-2">
       <button class="opt-btn" data-snow="0">Snow off</button>
@@ -519,7 +531,7 @@ const DEFAULT_COMMANDS = [
 ];
 const DEFAULTS = {
   theme: 'cyan', ai: 'gemini', state: 'idle', speed: 1, particles: 120, arcs: 0.35, size: 1,
-  quality: 'balanced', camera: 'drift', snow: 0, scene: 'neural', layers: Object.assign({}, SCENES.neural.layers)
+  quality: 'balanced', camera: 'drift', touch: 'random', snow: 0, scene: 'neural', layers: Object.assign({}, SCENES.neural.layers)
 };
 const KEY = 'novaApexCfg';
 const KEYS_KEY = 'novaApexKeys';
@@ -713,6 +725,7 @@ function drawParticles(t, k) {
     ctx.globalAlpha = [0.25, 0.5, 0.8][g];
     ctx.beginPath();
     for (const p of list) {
+      if (force) applyForce(p, k);
       p.x += p.vx * k; p.y += p.vy * k;
       if (p.x < 0) p.x = W; else if (p.x > W) p.x = 0;
       if (p.y < 0) p.y = H; else if (p.y > H) p.y = 0;
@@ -859,6 +872,132 @@ function drawArcs(t, k, cx, cy) {
 }
 
 // The glowing core is a pre-drawn image, just scaled each frame
+// ===== Touch effects =====
+let touchFx = [], touchSparks = [], trail = [], force = null;
+let lean = { x: 0, y: 0, tx: 0, ty: 0 }, camX = 0, camY = 0;
+const TOUCH_KINDS = ['burst', 'bolt', 'vortex', 'ripple', 'shock'];
+
+function sparkBurst(x, y, n, speed) {
+  const t = th();
+  for (let i = 0; i < n && touchSparks.length < 300; i++) {
+    const a = Math.random() * Math.PI * 2, v = speed * (0.4 + Math.random());
+    touchSparks.push({ x: x, y: y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 1, c: Math.random() < 0.6 ? t.p : t.a });
+  }
+}
+
+function touchAt(x, y) {
+  let kind = cfg.touch || 'random';
+  if (kind === 'random') kind = TOUCH_KINDS[(Math.random() * TOUCH_KINDS.length) | 0];
+  // the core leans toward the touch for a moment
+  lean.tx = (x - W / 2) * 0.12; lean.ty = (y - H / 2) * 0.12;
+  setTimeout(() => { lean.tx = 0; lean.ty = 0; }, 900);
+  if (kind === 'pulse') { pulse(); return; }
+  if (kind === 'burst') { sparkBurst(x, y, 60, 5); touchFx.push({ k: 'flash', x: x, y: y, life: 1 }); }
+  if (kind === 'bolt') {
+    touchFx.push({ k: 'bolt', x: x, y: y, life: 1, pts: makeBolt(camX + lean.x, camY + lean.y, x, y, Math.hypot(x - camX, y - camY) * 0.35) });
+    sparkBurst(x, y, 24, 3.5);
+    targetLevel = Math.max(targetLevel, 0.8);
+  }
+  if (kind === 'vortex') { force = { x: x, y: y, life: 1, pull: 1 }; touchFx.push({ k: 'spiral', x: x, y: y, life: 1 }); }
+  if (kind === 'ripple') touchFx.push({ k: 'ripple', x: x, y: y, life: 1 });
+  if (kind === 'shock') {
+    force = { x: x, y: y, life: 1, pull: -1 };
+    touchFx.push({ k: 'shock', x: x, y: y, life: 1 });
+    for (const f of flakes) { const d = Math.hypot(f.x - x, f.y - y) + 1; f.x += (f.x - x) / d * Math.max(0, 140 - d) * 0.6; f.y += (f.y - y) / d * Math.max(0, 140 - d) * 0.6; }
+  }
+}
+
+// Vortex pulls particles into a swirl around the finger; shockwave pushes them out
+function applyForce(p, k) {
+  const dx = force.x - p.x, dy = force.y - p.y, d = Math.hypot(dx, dy) + 20;
+  if (d > 320) return;
+  const s = force.life * 1.6 * k / d * 40;
+  if (force.pull > 0) { p.x += (dx * 0.6 - dy * 1.2) / d * s; p.y += (dy * 0.6 + dx * 1.2) / d * s; }
+  else { p.x -= dx / d * s * 3; p.y -= dy / d * s * 3; }
+}
+
+function drawTouch(t, k) {
+  // lean eases toward its target
+  lean.x += (lean.tx - lean.x) * 0.08 * k; lean.y += (lean.ty - lean.y) * 0.08 * k;
+  if (force) { force.life -= 0.012 * k; if (force.life <= 0) force = null; }
+
+  // finger trail
+  if (trail.length) {
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    for (let i = 1; i < trail.length; i++) {
+      const a = trail[i - 1], b = trail[i];
+      ctx.strokeStyle = i % 2 ? t.p : t.a;
+      ctx.globalAlpha = b.life * 0.9; ctx.lineWidth = 1 + b.life * 6;
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    }
+    trail.forEach(p => p.life -= 0.04 * k);
+    trail = trail.filter(p => p.life > 0);
+    ctx.lineCap = 'butt'; ctx.lineJoin = 'miter';
+  }
+
+  touchFx = touchFx.filter(f => {
+    const e = 1 - f.life;
+    if (f.k === 'flash') {
+      ctx.drawImage(coreSprite, f.x - 60 * f.life, f.y - 60 * f.life, 120 * f.life, 120 * f.life);
+      f.life -= 0.06 * k;
+    } else if (f.k === 'bolt') {
+      [[6, t.p, 0.4], [2, '#ffffff', 1]].forEach(([lw, col, al]) => {
+        ctx.strokeStyle = col; ctx.lineWidth = lw; ctx.globalAlpha = al * f.life;
+        ctx.beginPath(); f.pts.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.stroke();
+      });
+      if (Math.random() < 0.3) f.pts = makeBolt(camX + lean.x, camY + lean.y, f.x, f.y, Math.hypot(f.x - camX, f.y - camY) * 0.35);
+      f.life -= 0.05 * k;
+    } else if (f.k === 'spiral') {
+      ctx.lineWidth = 2.6; ctx.lineCap = 'round';
+      for (let arm = 0; arm < 3; arm++) {
+        ctx.strokeStyle = arm === 1 ? t.a : t.p;
+        ctx.globalAlpha = Math.min(1, f.life * 1.3);
+        ctx.beginPath();
+        for (let j = 0; j <= 40; j++) {
+          const r = j * 2.4 * (0.5 + f.life), a = arm * Math.PI * 2 / 3 + j * 0.25 - e * 12;
+          const x = f.x + Math.cos(a) * r, y = f.y + Math.sin(a) * r;
+          if (j) ctx.lineTo(x, y); else ctx.moveTo(x, y);
+        }
+        ctx.stroke();
+      }
+      f.life -= 0.012 * k;
+    } else if (f.k === 'ripple') {
+      for (let i = 0; i < 3; i++) {
+        const r = Math.max(0, e * 180 - i * 28);
+        ctx.strokeStyle = i % 2 ? t.a : t.p; ctx.lineWidth = 2.5 - i * 0.6; ctx.globalAlpha = f.life * (1 - i * 0.25);
+        ctx.beginPath(); ctx.arc(f.x, f.y, r, 0, Math.PI * 2); ctx.stroke();
+      }
+      ctx.strokeStyle = t.a; ctx.globalAlpha = f.life; ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      for (let j = 0; j <= 6; j++) {
+        const a = j / 6 * Math.PI * 2 + e * 2, r = 20 + e * 50;
+        if (j) ctx.lineTo(f.x + Math.cos(a) * r, f.y + Math.sin(a) * r); else ctx.moveTo(f.x + Math.cos(a) * r, f.y + Math.sin(a) * r);
+      }
+      ctx.stroke();
+      f.life -= 0.02 * k;
+    } else if (f.k === 'shock') {
+      const r = e * Math.max(W, H) * 0.6;
+      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 4 * f.life; ctx.globalAlpha = f.life * 0.8;
+      ctx.beginPath(); ctx.arc(f.x, f.y, r, 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = t.p; ctx.lineWidth = 12 * f.life; ctx.globalAlpha = f.life * 0.25;
+      ctx.beginPath(); ctx.arc(f.x, f.y, r * 0.92, 0, Math.PI * 2); ctx.stroke();
+      f.life -= 0.035 * k;
+    }
+    return f.life > 0;
+  });
+
+  if (touchSparks.length) {
+    for (const col of [t.p, t.a]) {
+      ctx.fillStyle = col; ctx.globalAlpha = 0.95;
+      ctx.beginPath();
+      for (const s of touchSparks) if (s.c === col) ctx.rect(s.x - 1.8 * s.life - 0.4, s.y - 1.8 * s.life - 0.4, 3.6 * s.life + 0.8, 3.6 * s.life + 0.8);
+      ctx.fill();
+    }
+    touchSparks = touchSparks.filter(s => { s.x += s.vx * k; s.y += s.vy * k; s.vx *= 0.96; s.vy *= 0.96; s.vy += 0.03 * k; s.life -= 0.02 * k; return s.life > 0; });
+  }
+  ctx.globalAlpha = 1;
+}
+
 function drawCore(t, cx, cy) {
   if (!coreSprite || spriteTheme !== cfg.theme) buildThemeCache();
   const r = (26 + Math.sin(phase * 3) * 5 + level * 14) * cfg.size * 2.4;
@@ -1825,12 +1964,14 @@ function render(dt) {
   if (cam) {
     const c = clock * cam.sp;
     const z = 1 + Math.sin(c * 0.23) * cam.zoom + cam.zoom;
-    ctx.translate(W / 2 + Math.sin(c * 0.13) * W * cam.x, H / 2 + Math.cos(c * 0.17) * H * cam.y);
+    camX = W / 2 + Math.sin(c * 0.13) * W * cam.x; camY = H / 2 + Math.cos(c * 0.17) * H * cam.y;
+    ctx.translate(camX, camY);
     ctx.rotate(Math.sin(c * 0.09) * cam.rot);
     ctx.scale(z, z);
     ctx.translate(-W / 2, -H / 2);
   }
-  const cx = W / 2, cy = H / 2;
+  if (!cam) { camX = W / 2; camY = H / 2; }
+  const cx = W / 2 + lean.x, cy = H / 2 + lean.y;
   const R = Math.min(W, H) * 0.32 * cfg.size;
   const L = cfg.layers;
   if (L.aurora) drawAurora(t);
@@ -1878,6 +2019,7 @@ function render(dt) {
   if (L.hudpanels) drawHudPanels(t, k);
   if (L.voiceprint) drawVoicePrint(t);
   if (L.glitch) drawGlitch(t, k);
+  drawTouch(t, dt);
   drawSnow(dt);
 }
 
@@ -1932,10 +2074,17 @@ window.addEventListener('pointermove', e => {
   rotY += dx * 0.008;
   rotX = Math.max(-1.2, Math.min(1.2, rotX + dy * 0.008));
   drag.x = e.clientX; drag.y = e.clientY;
+  // glowing finger trail
+  if (drag.moved) {
+    trail.push({ x: e.clientX, y: e.clientY, life: 1 });
+    if (trail.length > 40) trail.shift();
+    lean.tx = (e.clientX - W / 2) * 0.08; lean.ty = (e.clientY - H / 2) * 0.08;
+  }
 });
 window.addEventListener('pointerup', () => {
+  if (drag && drag.moved) { lean.tx = 0; lean.ty = 0; }
   if (drag && !drag.moved) {
-    pulse();
+    touchAt(drag.x, drag.y);
     const now = Date.now();
     if (isWall && cfg.voice.wallTap && now - lastTap < 350 && hasNative('openAssistant')) {
       Android.openAssistant();
@@ -2031,6 +2180,7 @@ function updateUI() {
   act('[data-quality]', b => b.dataset.quality === cfg.quality);
   act('[data-snow]', b => +b.dataset.snow === (cfg.snow || 0));
   act('[data-camera]', b => b.dataset.camera === (cfg.camera || 'drift'));
+  act('[data-touch]', b => b.dataset.touch === (cfg.touch || 'random'));
   act('[data-vt]', b => !!cfg.voice[b.dataset.vt]);
   [['Speed', 'speed', 'x'], ['Particles', 'particles', ''], ['Arcs', 'arcs', ''], ['Size', 'size', 'x']].forEach(([id, k, u]) => {
     $('rng' + id).value = cfg[k];
@@ -2096,6 +2246,7 @@ function buildUI() {
   document.querySelectorAll('[data-quality]').forEach(b => b.onclick = () => set('quality', b.dataset.quality));
   document.querySelectorAll('[data-snow]').forEach(b => b.onclick = () => set('snow', +b.dataset.snow));
   document.querySelectorAll('[data-camera]').forEach(b => b.onclick = () => set('camera', b.dataset.camera));
+  document.querySelectorAll('[data-touch]').forEach(b => b.onclick = () => set('touch', b.dataset.touch));
   [['Speed', 'speed'], ['Particles', 'particles'], ['Arcs', 'arcs'], ['Size', 'size']].forEach(([id, k]) => {
     $('rng' + id).oninput = e => set(k, parseFloat(e.target.value));
   });
