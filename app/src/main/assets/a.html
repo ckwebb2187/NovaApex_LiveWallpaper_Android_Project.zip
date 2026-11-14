@@ -173,6 +173,15 @@ body.wallpaper #hotkeys,body.wallpaper #askBar{display:none;}
     <div class="slider-row"><span>Arcs</span><input type="range" id="rngArcs" min="0" max="1" step="0.05"><b id="valArcs"></b></div>
     <div class="slider-row"><span>Size</span><input type="range" id="rngSize" min="0.5" max="1.8" step="0.05"><b id="valSize"></b></div>
 
+    <div class="sec-label">Camera motion</div>
+    <div class="grid-2">
+      <button class="opt-btn" data-camera="still">Still</button>
+      <button class="opt-btn" data-camera="drift">Drift</button>
+      <button class="opt-btn" data-camera="orbit">Orbit</button>
+      <button class="opt-btn" data-camera="wild">Wild</button>
+    </div>
+    <div class="note">Keeps the whole scene gliding, swaying and zooming so it's always in motion, even while Nova is idle.</div>
+
     <div class="sec-label">Wallpaper quality</div>
     <div class="grid-3">
       <button class="opt-btn" data-quality="battery">Battery</button>
@@ -386,7 +395,10 @@ const LAYERS = {
   sphere: 'Neural sphere', orbits: 'Atom orbits', rings: 'HUD rings', warp: 'Warp stars', grid: 'Holo grid',
   wave: 'Voice wave', scan: 'Scanlines', helix: 'DNA helix', hex: 'Hex shield', radar: 'Radar sweep',
   rain: 'Data rain', nebula: 'Nebula clouds', tendrils: 'Plasma tendrils', galaxy: 'Spiral galaxy',
-  tunnel: 'Wormhole', beat: 'Heartbeat rings', spectrum: 'Spectrum bars'
+  tunnel: 'Wormhole', beat: 'Heartbeat rings', spectrum: 'Spectrum bars',
+  aurora: 'Aurora', flow: 'Flow field', lasers: 'Laser show', ocean: 'Ocean waves', meteors: 'Meteor shower',
+  lightning: 'Lightning', mandala: 'Mandala', circuit: 'Circuit board', fireworks: 'Fireworks', bubbles: 'Bubbles',
+  planets: 'Solar system', spiro: 'Spirograph', fireflies: 'Fireflies', comets: 'Comets'
 };
 // Each scene lists the layers it turns on; everything else is off
 const SCENE_LIST = [
@@ -415,7 +427,30 @@ const SCENE_LIST = [
   ['holoradar', 'Holo Radar', 'radar grid'],
   ['pulsecore', 'Pulse Core', 'beat spectrum'],
   ['fortress', 'Fortress', 'hex orbits scan'],
-  ['overdrive', 'Overdrive', 'tunnel spectrum tendrils rain']
+  ['overdrive', 'Overdrive', 'tunnel spectrum tendrils rain'],
+  ['aurora', 'Aurora Night', 'aurora fireflies'],
+  ['flow', 'Flow Field', 'flow'],
+  ['lasershow', 'Laser Show', 'lasers beat'],
+  ['ocean', 'Ocean Waves', 'ocean bubbles'],
+  ['meteors', 'Meteor Shower', 'meteors nebula'],
+  ['thunder', 'Thunderstorm', 'lightning rain'],
+  ['mandala', 'Mandala', 'mandala spiro'],
+  ['circuit', 'Circuit Board', 'circuit scan'],
+  ['fireworks', 'Fireworks', 'fireworks'],
+  ['deepsea', 'Deep Sea', 'bubbles fireflies ocean'],
+  ['solar', 'Solar System', 'planets'],
+  ['spiro', 'Spirograph', 'spiro'],
+  ['forest', 'Firefly Forest', 'fireflies aurora'],
+  ['comets', 'Comet Chase', 'comets warp'],
+  ['rave', 'Rave', 'lasers spectrum beat'],
+  ['polar', 'Polar Galaxy', 'aurora galaxy'],
+  ['cyberpunk', 'Cyberpunk', 'circuit rain lasers'],
+  ['zen', 'Zen Garden', 'mandala fireflies'],
+  ['stormcore', 'Storm Core', 'lightning tendrils'],
+  ['voyage', 'Cosmic Voyage', 'planets warp comets'],
+  ['liquid', 'Liquid Light', 'flow ocean'],
+  ['newyear', 'New Year', 'fireworks meteors'],
+  ['hyperrave', 'Hyper Rave', 'tunnel lasers spectrum']
 ];
 const SCENES = {};
 SCENE_LIST.forEach(([key, label, on]) => {
@@ -463,7 +498,7 @@ const DEFAULT_COMMANDS = [
 ];
 const DEFAULTS = {
   theme: 'cyan', ai: 'gemini', state: 'idle', speed: 1, particles: 120, arcs: 0.35, size: 1,
-  quality: 'balanced', snow: 0, scene: 'neural', layers: Object.assign({}, SCENES.neural.layers)
+  quality: 'balanced', camera: 'drift', snow: 0, scene: 'neural', layers: Object.assign({}, SCENES.neural.layers)
 };
 const KEY = 'novaApexCfg';
 const KEYS_KEY = 'novaApexKeys';
@@ -1099,6 +1134,335 @@ function drawSnow(k) {
   ctx.globalAlpha = 1;
 }
 
+// ===== Full-screen motion layers =====
+let flowPts = [], circuitTraces = [], fwRockets = [], fwSparks = [], bubbleList = [], fireflyList = [];
+let meteorList = [], bolt = null, boltTimer = 0, fireflySprite = null, clock = 0;
+
+function buildMotion() {
+  flowPts = [];
+  const fn = Math.round(Q().nodes * 4.5);
+  for (let i = 0; i < fn; i++) flowPts.push({ x: Math.random() * W, y: Math.random() * H, g: i % 2 });
+  // circuit traces: right-angle paths from the edges toward the core
+  circuitTraces = [];
+  for (let i = 0; i < 18; i++) {
+    const side = i % 4, pts = [];
+    let x = side === 0 ? 0 : side === 1 ? W : Math.random() * W;
+    let y = side === 2 ? 0 : side === 3 ? H : Math.random() * H;
+    pts.push([x, y]);
+    for (let j = 0; j < 5; j++) {
+      if (j % 2 === 0) x += (W / 2 - x) * (0.3 + Math.random() * 0.4);
+      else y += (H / 2 - y) * (0.3 + Math.random() * 0.4);
+      pts.push([x, y]);
+    }
+    let len = 0;
+    for (let j = 1; j < pts.length; j++) len += Math.abs(pts[j][0] - pts[j - 1][0]) + Math.abs(pts[j][1] - pts[j - 1][1]);
+    circuitTraces.push({ pts: pts, len: len, off: Math.random() });
+  }
+  bubbleList = [];
+  for (let i = 0; i < 38; i++) bubbleList.push({ x: Math.random() * W, y: Math.random() * H, r: 3 + Math.random() * 12, v: 0.4 + Math.random() * 1.1, w: Math.random() * 6 });
+  fireflyList = [];
+  for (let i = 0; i < 34; i++) fireflyList.push({ x: Math.random() * W, y: Math.random() * H, a: Math.random() * 6, s: 0.5 + Math.random(), c: i % 2 });
+  meteorList = []; fwRockets = []; fwSparks = []; bolt = null; fireflySprite = null;
+}
+
+function pointAlong(tr, d) {
+  for (let j = 1; j < tr.pts.length; j++) {
+    const a = tr.pts[j - 1], b = tr.pts[j];
+    const seg = Math.abs(b[0] - a[0]) + Math.abs(b[1] - a[1]);
+    if (d <= seg) { const f = seg ? d / seg : 0; return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f]; }
+    d -= seg;
+  }
+  return tr.pts[tr.pts.length - 1];
+}
+
+function drawAurora(t) {
+  for (let i = 0; i < 3; i++) {
+    const base = H * (0.16 + i * 0.08), height = H * (0.2 + i * 0.04);
+    const g = ctx.createLinearGradient(0, base - 55, 0, base + height + 35);
+    const col = i === 1 ? t.a : t.p;
+    g.addColorStop(0, col + '00'); g.addColorStop(0.45, col + '50'); g.addColorStop(0.7, col + '22'); g.addColorStop(1, col + '00');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    const steps = 24;
+    for (let j = 0; j <= steps; j++) {
+      const x = j / steps * W;
+      const y = base + Math.sin(x * 0.006 + phase * (0.6 + i * 0.25) + i * 2) * 38 + Math.sin(x * 0.017 - phase * 0.9) * 14;
+      if (j) ctx.lineTo(x, y); else ctx.moveTo(x, y);
+    }
+    for (let j = steps; j >= 0; j--) {
+      const x = j / steps * W;
+      const y = base + height + Math.sin(x * 0.009 - phase * 0.7 + i) * 30;
+      ctx.lineTo(x, y);
+    }
+    ctx.fill();
+  }
+}
+
+function drawFlow(t, k) {
+  ctx.lineWidth = 1.8; ctx.lineCap = 'round';
+  for (let g = 0; g < 2; g++) {
+    ctx.strokeStyle = g ? t.a : t.p; ctx.globalAlpha = g ? 0.75 : 0.95;
+    ctx.beginPath();
+    for (const p of flowPts) {
+      if (p.g !== g) continue;
+      const ang = (Math.sin(p.x * 0.005 + phase * 0.5) + Math.cos(p.y * 0.006 - phase * 0.4)) * Math.PI;
+      const vx = Math.cos(ang) * 1.6 * k, vy = Math.sin(ang) * 1.6 * k;
+      ctx.moveTo(p.x, p.y);
+      p.x += vx; p.y += vy;
+      ctx.lineTo(p.x + vx * 9, p.y + vy * 9);
+      if (p.x < 0 || p.x > W || p.y < 0 || p.y > H) { p.x = Math.random() * W; p.y = Math.random() * H; }
+    }
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1; ctx.lineCap = 'butt';
+}
+
+function drawLasers(t) {
+  const beams = 8, len = Math.max(W, H) * 1.3;
+  ctx.lineCap = 'round';
+  [[6, 0.18], [1.6, 0.9]].forEach(([lw, al], pass) => {
+    ctx.lineWidth = lw * (1 + level);
+    for (let i = 0; i < beams; i++) {
+      const fromLeft = i % 2 === 0;
+      const ox = fromLeft ? 0 : W, oy = H;
+      const ang = (fromLeft ? -Math.PI / 2 + 0.9 : -Math.PI / 2 - 0.9) + Math.sin(phase * (0.8 + i * 0.13) + i) * 0.7;
+      ctx.strokeStyle = pass ? '#ffffff' : (i % 3 ? t.p : t.a);
+      ctx.globalAlpha = pass ? al * 0.6 : al;
+      ctx.beginPath(); ctx.moveTo(ox, oy); ctx.lineTo(ox + Math.cos(ang) * len, oy + Math.sin(ang) * len); ctx.stroke();
+    }
+  });
+  ctx.globalAlpha = 1; ctx.lineCap = 'butt';
+}
+
+function drawOcean(t) {
+  ctx.lineWidth = 1.6;
+  for (let i = 0; i < 7; i++) {
+    const y0 = H * (0.62 + i * 0.055);
+    ctx.strokeStyle = i % 2 ? t.a : t.p;
+    ctx.globalAlpha = 0.25 + i * 0.09;
+    ctx.beginPath();
+    for (let j = 0; j <= 30; j++) {
+      const x = j / 30 * W;
+      const y = y0 + Math.sin(x * 0.012 + phase * (1.2 + i * 0.15) + i) * (8 + i * 2) + Math.sin(x * 0.03 - phase * 2) * 3;
+      if (j) ctx.lineTo(x, y); else ctx.moveTo(x, y);
+    }
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawMeteors(t, k) {
+  if (meteorList.length < 6 && Math.random() < 0.03 * k) {
+    meteorList.push({ x: Math.random() * W * 1.2, y: -20, v: 7 + Math.random() * 7, l: 80 + Math.random() * 120 });
+  }
+  ctx.lineCap = 'round';
+  meteorList = meteorList.filter(m => {
+    m.x -= m.v * 0.6 * k; m.y += m.v * k;
+    const tx = m.x + m.l * 0.5, ty = m.y - m.l;
+    const g = ctx.createLinearGradient(m.x, m.y, tx, ty);
+    g.addColorStop(0, '#ffffff'); g.addColorStop(0.2, t.p); g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.strokeStyle = g; ctx.lineWidth = 2.2;
+    ctx.beginPath(); ctx.moveTo(m.x, m.y); ctx.lineTo(tx, ty); ctx.stroke();
+    return m.y < H + 50 && m.x > -200;
+  });
+  ctx.lineCap = 'butt';
+}
+
+function makeBolt(x1, y1, x2, y2, rough) {
+  const pts = [[x1, y1], [x2, y2]];
+  for (let n = 0; n < 5; n++) {
+    for (let i = pts.length - 1; i > 0; i--) {
+      const a = pts[i - 1], b = pts[i];
+      pts.splice(i, 0, [(a[0] + b[0]) / 2 + (Math.random() - 0.5) * rough, (a[1] + b[1]) / 2 + (Math.random() - 0.5) * rough * 0.4]);
+    }
+    rough *= 0.55;
+  }
+  return pts;
+}
+function drawLightning(t, k) {
+  boltTimer -= k;
+  const chance = curState() === 'thinking' ? 0.06 : 0.018;
+  if (!bolt && boltTimer <= 0 && Math.random() < chance * k) {
+    const x = Math.random() * W;
+    bolt = { pts: makeBolt(x, 0, x + (Math.random() - 0.5) * W * 0.4, H * (0.5 + Math.random() * 0.4), W * 0.25), life: 1 };
+  }
+  if (!bolt) return;
+  ctx.fillStyle = t.p; ctx.globalAlpha = bolt.life * 0.12;
+  ctx.fillRect(0, 0, W, H);
+  [[5, t.p, 0.35], [1.6, '#ffffff', 1]].forEach(([lw, col, al]) => {
+    ctx.strokeStyle = col; ctx.lineWidth = lw; ctx.globalAlpha = al * bolt.life;
+    ctx.beginPath();
+    bolt.pts.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]));
+    ctx.stroke();
+  });
+  ctx.globalAlpha = 1;
+  bolt.life -= 0.07 * k;
+  if (bolt.life <= 0) { bolt = null; boltTimer = 20; }
+}
+
+function drawMandala(t, cx, cy, R) {
+  ctx.lineWidth = 1.3;
+  [[12, 0.95, 1, t.p], [8, 0.65, -1.4, t.a], [16, 1.25, 0.6, t.p]].forEach(([n, f, dir, col]) => {
+    const r = R * f, rot = phase * 0.3 * dir;
+    ctx.strokeStyle = col; ctx.globalAlpha = 0.6;
+    ctx.beginPath();
+    for (let i = 0; i < n; i++) {
+      const a = rot + i / n * Math.PI * 2, b = a + Math.PI / n;
+      const bulge = r * (0.35 + Math.sin(phase * 1.5 + i) * 0.06 + level * 0.2);
+      ctx.moveTo(cx + Math.cos(a) * r * 0.3, cy + Math.sin(a) * r * 0.3);
+      ctx.quadraticCurveTo(cx + Math.cos(a - 0.35) * (r + bulge), cy + Math.sin(a - 0.35) * (r + bulge), cx + Math.cos(b) * r, cy + Math.sin(b) * r);
+      ctx.quadraticCurveTo(cx + Math.cos(a + 0.35) * (r + bulge) * 0.7, cy + Math.sin(a + 0.35) * (r + bulge) * 0.7, cx + Math.cos(a) * r * 0.3, cy + Math.sin(a) * r * 0.3);
+    }
+    ctx.stroke();
+  });
+  ctx.globalAlpha = 1;
+}
+
+function drawCircuit(t, k) {
+  ctx.strokeStyle = t.a; ctx.globalAlpha = 0.25; ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  for (const tr of circuitTraces) tr.pts.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]));
+  ctx.stroke();
+  ctx.fillStyle = t.a; ctx.globalAlpha = 0.5;
+  ctx.beginPath();
+  for (const tr of circuitTraces) { const e = tr.pts[tr.pts.length - 1]; ctx.rect(e[0] - 2.5, e[1] - 2.5, 5, 5); }
+  ctx.fill();
+  ctx.fillStyle = '#ffffff'; ctx.globalAlpha = 0.95;
+  ctx.beginPath();
+  for (const tr of circuitTraces) {
+    tr.off = (tr.off + 0.004 * k) % 1;
+    for (let q = 0; q < 2; q++) {
+      const pt = pointAlong(tr, ((tr.off + q * 0.5) % 1) * tr.len);
+      ctx.moveTo(pt[0] + 2.4, pt[1]); ctx.arc(pt[0], pt[1], 2.4, 0, Math.PI * 2);
+    }
+  }
+  ctx.fill();
+  ctx.globalAlpha = 1;
+}
+
+function drawFireworks(t, k) {
+  if (fwRockets.length < 4 && Math.random() < 0.035 * k) {
+    fwRockets.push({ x: W * (0.15 + Math.random() * 0.7), y: H, vy: -(7 + Math.random() * 4), top: H * (0.15 + Math.random() * 0.35), c: Math.random() < 0.5 ? t.p : t.a });
+  }
+  ctx.fillStyle = '#ffffff';
+  fwRockets = fwRockets.filter(r => {
+    r.y += r.vy * k;
+    ctx.globalAlpha = 0.9; ctx.fillRect(r.x - 1.5, r.y, 3, 8);
+    if (r.y <= r.top) {
+      for (let i = 0; i < 42; i++) {
+        const a = i / 42 * Math.PI * 2, sp = 2 + Math.random() * 2.5;
+        if (fwSparks.length < 400) fwSparks.push({ x: r.x, y: r.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 1, c: r.c });
+      }
+      return false;
+    }
+    return true;
+  });
+  for (const col of [t.p, t.a]) {
+    ctx.fillStyle = col;
+    for (const band of [1, 0.5]) {
+      ctx.globalAlpha = band;
+      ctx.beginPath();
+      for (const s of fwSparks) {
+        if (s.c !== col || (s.life > 0.5) !== (band === 1)) continue;
+        ctx.rect(s.x - 2, s.y - 2, 4, 4);
+      }
+      ctx.fill();
+    }
+  }
+  fwSparks = fwSparks.filter(s => {
+    s.x += s.vx * k; s.y += s.vy * k; s.vy += 0.05 * k; s.vx *= 0.985; s.life -= 0.012 * k;
+    return s.life > 0;
+  });
+  ctx.globalAlpha = 1;
+}
+
+function drawBubbles(t, k) {
+  ctx.strokeStyle = t.p; ctx.lineWidth = 1.2; ctx.globalAlpha = 0.55;
+  ctx.beginPath();
+  for (const b of bubbleList) {
+    b.y -= b.v * k; b.w += 0.03 * k;
+    if (b.y < -20) { b.y = H + 20; b.x = Math.random() * W; }
+    const x = b.x + Math.sin(b.w) * 8;
+    ctx.moveTo(x + b.r, b.y); ctx.arc(x, b.y, b.r, 0, Math.PI * 2);
+  }
+  ctx.stroke();
+  ctx.fillStyle = '#ffffff'; ctx.globalAlpha = 0.6;
+  ctx.beginPath();
+  for (const b of bubbleList) { const x = b.x + Math.sin(b.w) * 8 - b.r * 0.35, y = b.y - b.r * 0.35; ctx.moveTo(x + b.r * 0.2, y); ctx.arc(x, y, b.r * 0.2, 0, Math.PI * 2); }
+  ctx.fill();
+  ctx.globalAlpha = 1;
+}
+
+const PLANETS = [[0.55, 4, 1.6], [0.8, 6, 1.1], [1.08, 8, 0.75], [1.38, 5, 0.55], [1.7, 10, 0.4]];
+function drawPlanets(t, cx, cy, R) {
+  ctx.strokeStyle = t.a; ctx.globalAlpha = 0.25; ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (const [f] of PLANETS) { ctx.moveTo(cx + R * f, cy); ctx.ellipse(cx, cy, R * f, R * f * 0.42, 0, 0, Math.PI * 2); }
+  ctx.stroke();
+  PLANETS.forEach(([f, size, sp], i) => {
+    const a = phase * sp * 0.8 + i * 1.7;
+    const x = cx + Math.cos(a) * R * f, y = cy + Math.sin(a) * R * f * 0.42;
+    ctx.globalAlpha = 1; ctx.fillStyle = i % 2 ? t.a : t.p;
+    ctx.beginPath(); ctx.arc(x, y, size * (0.8 + 0.4 * (Math.sin(a) + 1) / 2), 0, Math.PI * 2); ctx.fill();
+    if (i === 2) { ctx.strokeStyle = '#ffffff'; ctx.globalAlpha = 0.6; ctx.beginPath(); ctx.ellipse(x, y, size * 2.2, size * 0.7, -0.3, 0, Math.PI * 2); ctx.stroke(); }
+  });
+  ctx.globalAlpha = 1;
+}
+
+function drawSpiro(t, cx, cy, R) {
+  const big = 1, small = 0.32 + Math.sin(phase * 0.07) * 0.12, d = 0.55 + Math.sin(phase * 0.05) * 0.2;
+  const n = 360, scale = R * 0.75, rot = phase * 0.15;
+  const drawn = Math.floor(n * (0.5 + ((phase * 0.08) % 1) * 0.5));
+  ctx.strokeStyle = t.p; ctx.lineWidth = 1.3; ctx.globalAlpha = 0.75;
+  ctx.beginPath();
+  for (let i = 0; i <= drawn; i++) {
+    const a = i / n * Math.PI * 2 * 7;
+    const x = (big - small) * Math.cos(a) + d * Math.cos((big - small) / small * a);
+    const y = (big - small) * Math.sin(a) - d * Math.sin((big - small) / small * a);
+    const xr = x * Math.cos(rot) - y * Math.sin(rot), yr = x * Math.sin(rot) + y * Math.cos(rot);
+    if (i) ctx.lineTo(cx + xr * scale, cy + yr * scale); else ctx.moveTo(cx + xr * scale, cy + yr * scale);
+  }
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+}
+
+function drawFireflies(t, k) {
+  if (!fireflySprite || fireflySprite.theme !== cfg.theme) fireflySprite = { theme: cfg.theme, list: [blobSprite(t.p), blobSprite(t.a)] };
+  for (const f of fireflyList) {
+    f.a += 0.02 * k;
+    f.x += Math.cos(f.a * 1.3) * 0.6 * f.s * k; f.y += Math.sin(f.a) * 0.5 * f.s * k;
+    if (f.x < -20) f.x = W + 20; if (f.x > W + 20) f.x = -20;
+    if (f.y < -20) f.y = H + 20; if (f.y > H + 20) f.y = -20;
+    const glow = 0.35 + (Math.sin(f.a * 3 + f.s * 5) + 1) * 0.32, size = 22 * f.s;
+    ctx.globalAlpha = glow;
+    ctx.drawImage(fireflySprite.list[f.c], f.x - size / 2, f.y - size / 2, size, size);
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawComets(t, cx, cy, R) {
+  [[1.25, 1, 0], [0.9, -1.4, 2], [1.55, 0.7, 4]].forEach(([f, sp, off], i) => {
+    const a = phase * sp + off, r = R * f;
+    for (let s = 0; s < 5; s++) {
+      ctx.strokeStyle = i % 2 ? t.a : t.p;
+      ctx.globalAlpha = 0.85 - s * 0.17; ctx.lineWidth = 4 - s * 0.7;
+      const a0 = a - Math.sign(sp) * s * 0.14, a1 = a - Math.sign(sp) * (s + 1) * 0.14;
+      ctx.beginPath(); ctx.arc(cx, cy, r, Math.min(a0, a1), Math.max(a0, a1)); ctx.stroke();
+    }
+    ctx.fillStyle = '#ffffff'; ctx.globalAlpha = 1;
+    ctx.beginPath(); ctx.arc(cx + Math.cos(a) * r, cy + Math.sin(a) * r, 3.5, 0, Math.PI * 2); ctx.fill();
+  });
+  ctx.globalAlpha = 1;
+}
+
+// ===== Camera motion: keeps every scene gently moving =====
+const CAMERA = {
+  still: null,
+  drift: { x: 0.06, y: 0.04, zoom: 0.05, rot: 0.03, sp: 1 },
+  orbit: { x: 0.1, y: 0.07, zoom: 0.08, rot: 0.1, sp: 1.4 },
+  wild:  { x: 0.16, y: 0.12, zoom: 0.14, rot: 0.25, sp: 2.2 }
+};
+
 function render(dt) {
   const t = th();
   const st = curState();
@@ -1113,14 +1477,34 @@ function render(dt) {
 
   // background is CSS; the canvas only clears and draws what moves
   ctx.clearRect(0, 0, W, H);
+  // camera moves on real time, so the scene never sits still
+  clock += 0.016 * dt;
+  const cam = CAMERA[cfg.camera || 'drift'];
+  ctx.save();
+  if (cam) {
+    const c = clock * cam.sp;
+    const z = 1 + Math.sin(c * 0.23) * cam.zoom + cam.zoom;
+    ctx.translate(W / 2 + Math.sin(c * 0.13) * W * cam.x, H / 2 + Math.cos(c * 0.17) * H * cam.y);
+    ctx.rotate(Math.sin(c * 0.09) * cam.rot);
+    ctx.scale(z, z);
+    ctx.translate(-W / 2, -H / 2);
+  }
   const cx = W / 2, cy = H / 2;
   const R = Math.min(W, H) * 0.32 * cfg.size;
   const L = cfg.layers;
+  if (L.aurora) drawAurora(t);
   if (L.nebula) drawNebula(t, cx, cy, R);
   if (L.galaxy) drawGalaxy(t, cx, cy, R);
   if (L.tunnel) drawTunnel(t, cx, cy, R);
   if (L.grid) drawGrid(t, k);
   if (L.rain) drawRain(t, k);
+  if (L.circuit) drawCircuit(t, k);
+  if (L.flow) drawFlow(t, k);
+  if (L.ocean) drawOcean(t);
+  if (L.meteors) drawMeteors(t, k);
+  if (L.bubbles) drawBubbles(t, k);
+  if (L.fireflies) drawFireflies(t, k);
+  if (L.lasers) drawLasers(t);
   if (L.warp) drawWarp(t, k, cx, cy);
   drawParticles(t, k);
   if (L.rings) drawRings(t, cx, cy, R);
@@ -1132,10 +1516,17 @@ function render(dt) {
   if (L.beat) drawBeat(t, cx, cy, R);
   if (L.tendrils) drawTendrils(t, cx, cy, R);
   if (L.spectrum) drawSpectrum(t, cx, cy, R);
+  if (L.mandala) drawMandala(t, cx, cy, R);
+  if (L.spiro) drawSpiro(t, cx, cy, R);
+  if (L.planets) drawPlanets(t, cx, cy, R);
+  if (L.comets) drawComets(t, cx, cy, R);
   if (L.wave) drawWave(t, cx, cy, R);
+  if (L.fireworks) drawFireworks(t, k);
+  if (L.lightning) drawLightning(t, k);
   drawArcs(t, k, cx, cy);
   drawCore(t, cx, cy);
   drawEmp(t, cx, cy, k);
+  ctx.restore();
   drawSnow(dt);
 }
 
@@ -1249,7 +1640,7 @@ function applyClockStyle(name) {
 function set(k, v) {
   cfg[k] = v;
   if (k === 'particles') buildParticles();
-  if (k === 'quality') { renderScale = 1; resize(); buildNodes(); buildStars(); buildExtras(); buildSnow(); }
+  if (k === 'quality') { renderScale = 1; resize(); buildNodes(); buildStars(); buildExtras(); buildMotion(); buildSnow(); }
   saveCfg(); updateUI();
 }
 
@@ -1288,6 +1679,7 @@ function updateUI() {
   act('[data-layer]', b => !!cfg.layers[b.dataset.layer]);
   act('[data-quality]', b => b.dataset.quality === cfg.quality);
   act('[data-snow]', b => +b.dataset.snow === (cfg.snow || 0));
+  act('[data-camera]', b => b.dataset.camera === (cfg.camera || 'drift'));
   act('[data-vt]', b => !!cfg.voice[b.dataset.vt]);
   [['Speed', 'speed', 'x'], ['Particles', 'particles', ''], ['Arcs', 'arcs', ''], ['Size', 'size', 'x']].forEach(([id, k, u]) => {
     $('rng' + id).value = cfg[k];
@@ -1341,6 +1733,7 @@ function buildUI() {
   document.querySelectorAll('[data-ai]').forEach(b => b.onclick = () => set('ai', b.dataset.ai));
   document.querySelectorAll('[data-quality]').forEach(b => b.onclick = () => set('quality', b.dataset.quality));
   document.querySelectorAll('[data-snow]').forEach(b => b.onclick = () => set('snow', +b.dataset.snow));
+  document.querySelectorAll('[data-camera]').forEach(b => b.onclick = () => set('camera', b.dataset.camera));
   [['Speed', 'speed'], ['Particles', 'particles'], ['Arcs', 'arcs'], ['Size', 'size']].forEach(([id, k]) => {
     $('rng' + id).oninput = e => set(k, parseFloat(e.target.value));
   });
@@ -1989,12 +2382,13 @@ window.syncConfig = function () {
   updateUI();
 };
 
-window.addEventListener('resize', () => { resize(); buildParticles(); buildExtras(); buildSnow(); });
+window.addEventListener('resize', () => { resize(); buildParticles(); buildExtras(); buildMotion(); buildSnow(); });
 resize();
 buildNodes();
 buildParticles();
 buildStars();
 buildExtras();
+buildMotion();
 buildSnow();
 if (!isWall) buildUI();
 updateUI();
