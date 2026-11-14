@@ -841,10 +841,14 @@ const RINGS = [
 function gyro(i, cx, cy, fn) {
   const mode = cfg.gyro || 'full';
   if (mode === 'off') { ctx.save(); fn(); ctx.restore(); return; }
-  const amp = mode === 'gentle' ? 0.6 : 1.2;
   const sp = curState() === 'thinking' ? 1.8 : 1;
-  const axis = phase * sp * (0.11 + (i % 5) * 0.045) * (i % 2 ? -1 : 1) + i * 1.37;
-  const tilt = amp * Math.sin(phase * sp * (0.16 + (i % 4) * 0.045) + i * 2.17);
+  // every ring gets its own speeds and directions from its number
+  const h1 = Math.sin(i * 12.9898) * 43758.5453, h2 = Math.sin(i * 78.233) * 12345.6789;
+  const r1 = h1 - Math.floor(h1), r2 = h2 - Math.floor(h2);
+  const axis = phase * sp * (0.06 + r1 * 0.22) * (r2 > 0.5 ? 1 : -1) + i * 1.37;
+  const tilt = mode === 'gentle'
+    ? 0.6 * Math.sin(phase * sp * (0.14 + r2 * 0.12) + i * 2.17)
+    : phase * sp * (0.12 + r2 * 0.3) * (r1 > 0.5 ? 1 : -1) + i * 0.9;   // full spin around its own axis
   const c = Math.cos(tilt);
   ctx.save();
   ctx.translate(cx, cy); ctx.rotate(axis); ctx.scale(1, c); ctx.rotate(-axis); ctx.translate(-cx, -cy);
@@ -889,7 +893,8 @@ function drawWave(t, cx, cy, R) {
   const base = R * 0.5, n = 72;
   const amp = R * (0.03 + level * 0.2);
   ctx.globalAlpha = 0.8;
-  [[t.p, 1, 2], [t.a, -1.3, 1.2]].forEach(([col, dir, lw]) => {
+  [[t.p, 1, 2], [t.a, -1.3, 1.2]].forEach(([col, dir, lw], k) => gyro(90 + k, cx, cy, () => {
+    ctx.globalAlpha = 0.8;
     ctx.beginPath();
     for (let i = 0; i <= n; i++) {
       const a = i / n * Math.PI * 2;
@@ -899,7 +904,7 @@ function drawWave(t, cx, cy, R) {
     }
     ctx.strokeStyle = col; ctx.lineWidth = lw;
     ctx.stroke();
-  });
+  }));
   ctx.globalAlpha = 1;
 }
 
@@ -1882,12 +1887,12 @@ function drawTendrils(t, cx, cy, R) {
 
 function drawBeat(t, cx, cy, R) {
   ctx.lineWidth = 2;
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 4; i++) gyro(60 + i, cx, cy, () => {
     const z = (phase * 0.45 + i / 4) % 1;
     ctx.strokeStyle = i % 2 ? t.a : t.p;
     ctx.globalAlpha = (1 - z) * 0.7;
     ctx.beginPath(); ctx.arc(cx, cy, R * 0.3 + z * R * 1.4, 0, Math.PI * 2); ctx.stroke();
-  }
+  });
   ctx.globalAlpha = 1;
 }
 
@@ -1898,7 +1903,7 @@ function drawSpectrum(t, cx, cy, R) {
     specBars[i] += (want - specBars[i]) * 0.3;
   }
   ctx.lineWidth = Math.max(2, base * 2 * Math.PI / n * 0.45);
-  [[0, t.p], [1, t.a]].forEach(([odd, col]) => {
+  [[0, t.p], [1, t.a]].forEach(([odd, col]) => gyro(110 + odd, cx, cy, () => {
     ctx.strokeStyle = col; ctx.globalAlpha = 0.8;
     ctx.beginPath();
     for (let i = odd; i < n; i += 2) {
@@ -1907,7 +1912,7 @@ function drawSpectrum(t, cx, cy, R) {
       ctx.moveTo(cx + c * base, cy + sn * base); ctx.lineTo(cx + c * (base + len), cy + sn * (base + len));
     }
     ctx.stroke();
-  });
+  }));
   ctx.globalAlpha = 1;
 }
 
@@ -2117,7 +2122,7 @@ function drawLightning(t, k) {
 
 function drawMandala(t, cx, cy, R) {
   ctx.lineWidth = 1.3;
-  [[12, 0.95, 1, t.p], [8, 0.65, -1.4, t.a], [16, 1.25, 0.6, t.p]].forEach(([n, f, dir, col]) => {
+  [[12, 0.95, 1, t.p], [8, 0.65, -1.4, t.a], [16, 1.25, 0.6, t.p]].forEach(([n, f, dir, col], k) => gyro(70 + k, cx, cy, () => {
     const r = R * f, rot = phase * 0.3 * dir;
     ctx.strokeStyle = col; ctx.globalAlpha = 0.6;
     ctx.beginPath();
@@ -2129,7 +2134,7 @@ function drawMandala(t, cx, cy, R) {
       ctx.quadraticCurveTo(cx + Math.cos(a + 0.35) * (r + bulge) * 0.7, cy + Math.sin(a + 0.35) * (r + bulge) * 0.7, cx + Math.cos(a) * r * 0.3, cy + Math.sin(a) * r * 0.3);
     }
     ctx.stroke();
-  });
+  }));
   ctx.globalAlpha = 1;
 }
 
@@ -2256,7 +2261,7 @@ function drawFireflies(t, k) {
 }
 
 function drawComets(t, cx, cy, R) {
-  [[1.25, 1, 0], [0.9, -1.4, 2], [1.55, 0.7, 4]].forEach(([f, sp, off], i) => {
+  [[1.25, 1, 0], [0.9, -1.4, 2], [1.55, 0.7, 4]].forEach(([f, sp, off], i) => gyro(80 + i, cx, cy, () => {
     const a = phase * sp + off, r = R * f;
     for (let s = 0; s < 5; s++) {
       ctx.strokeStyle = i % 2 ? t.a : t.p;
@@ -2266,7 +2271,7 @@ function drawComets(t, cx, cy, R) {
     }
     ctx.fillStyle = '#ffffff'; ctx.globalAlpha = 1;
     ctx.beginPath(); ctx.arc(cx + Math.cos(a) * r, cy + Math.sin(a) * r, 3.5, 0, Math.PI * 2); ctx.fill();
-  });
+  }));
   ctx.globalAlpha = 1;
 }
 
@@ -2660,19 +2665,19 @@ function render(dt) {
   if (L.hex) gyro(45, cx, cy, () => drawHex(t, cx, cy, R));
   if (L.radar) gyro(44, cx, cy, () => drawRadar(t, cx, cy, R));
   if (L.helix) drawHelix(t, cx, cy, R);
-  if (L.beat) gyro(40, cx, cy, () => drawBeat(t, cx, cy, R));
+  if (L.beat) drawBeat(t, cx, cy, R);
   if (L.tendrils) drawTendrils(t, cx, cy, R);
-  if (L.spectrum) gyro(41, cx, cy, () => drawSpectrum(t, cx, cy, R));
-  if (L.mandala) gyro(42, cx, cy, () => drawMandala(t, cx, cy, R));
+  if (L.spectrum) drawSpectrum(t, cx, cy, R);
+  if (L.mandala) drawMandala(t, cx, cy, R);
   if (L.spiro) gyro(43, cx, cy, () => drawSpiro(t, cx, cy, R));
   if (L.planets) drawPlanets(t, cx, cy, R);
-  if (L.comets) gyro(47, cx, cy, () => drawComets(t, cx, cy, R));
+  if (L.comets) drawComets(t, cx, cy, R);
   if (L.hologlobe) drawHoloGlobe(t, cx, cy, R);
   if (L.icosa) drawIcosa(t, cx, cy, R);
   if (L.dataring) drawDataRing(t, cx, cy, R);
   if (L.hudrings) drawHudRings(t, cx, cy, R);
   if (L.targeting) drawTargeting(t, k);
-  if (L.wave) gyro(46, cx, cy, () => drawWave(t, cx, cy, R));
+  if (L.wave) drawWave(t, cx, cy, R);
   if (L.fireworks) drawFireworks(t, k);
   if (L.lightning) drawLightning(t, k);
   // only the inner core and its face squish, hop and wiggle; the layers around it stay steady
