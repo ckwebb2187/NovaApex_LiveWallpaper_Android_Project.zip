@@ -211,6 +211,14 @@ body.wallpaper #hotkeys,body.wallpaper #askBar{display:none;}
     </div>
     <div class="note">Keeps the whole scene gliding, swaying and zooming so it's always in motion, even while Nova is idle.</div>
 
+    <div class="sec-label">3D gyroscope</div>
+    <div class="grid-3">
+      <button class="opt-btn" data-gyro="off">Flat</button>
+      <button class="opt-btn" data-gyro="gentle">Gentle</button>
+      <button class="opt-btn" data-gyro="full">Full</button>
+    </div>
+    <div class="note">Rings around the core tilt on their own axes and tumble in 3D like a gyroscope, faster while Nova is thinking.</div>
+
     <div class="sec-label">Wallpaper quality</div>
     <div class="grid-3">
       <button class="opt-btn" data-quality="battery">Battery</button>
@@ -548,7 +556,7 @@ const DEFAULT_COMMANDS = [
 ];
 const DEFAULTS = {
   theme: 'cyan', ai: 'gemini', state: 'idle', speed: 1, particles: 120, arcs: 0.35, size: 1,
-  quality: 'balanced', camera: 'drift', persona: 'quirky', face: true, eyes: 'capsule', touch: 'random', snow: 0, scene: 'neural', layers: Object.assign({}, SCENES.neural.layers)
+  quality: 'balanced', camera: 'drift', gyro: 'full', persona: 'quirky', face: true, eyes: 'capsule', touch: 'random', snow: 0, scene: 'neural', layers: Object.assign({}, SCENES.neural.layers)
 };
 const KEY = 'novaApexCfg';
 const KEYS_KEY = 'novaApexKeys';
@@ -826,21 +834,46 @@ const RINGS = [
   { f: 0.9,  dir: 0.7,  w: 1.6, dash: r => [r * 0.6, r * 0.15, r * 0.05, r * 0.15] },
   { f: 1.08, dir: -0.3, w: 1,   dash: () => [] }
 ];
+// ===== 3D gyroscope =====
+// Draws a flat ring layer as if its plane were tilted in 3D: each ring gets its own
+// tilt axis that slowly turns, so circles swing into ellipses and back like gimbals.
+// (Orthographic projection of a tilted plane = rotate, squash one axis, rotate back.)
+function gyro(i, cx, cy, fn) {
+  const mode = cfg.gyro || 'full';
+  if (mode === 'off') { ctx.save(); fn(); ctx.restore(); return; }
+  const sp = curState() === 'thinking' ? 1.8 : 1;
+  // every ring gets its own speeds and directions from its number
+  const h1 = Math.sin(i * 12.9898) * 43758.5453, h2 = Math.sin(i * 78.233) * 12345.6789;
+  const r1 = h1 - Math.floor(h1), r2 = h2 - Math.floor(h2);
+  const axis = phase * sp * (0.06 + r1 * 0.22) * (r2 > 0.5 ? 1 : -1) + i * 1.37;
+  const tilt = mode === 'gentle'
+    ? 0.6 * Math.sin(phase * sp * (0.14 + r2 * 0.12) + i * 2.17)
+    : phase * sp * (0.12 + r2 * 0.3) * (r1 > 0.5 ? 1 : -1) + i * 0.9;   // full spin around its own axis
+  const c = Math.cos(tilt);
+  ctx.save();
+  ctx.translate(cx, cy); ctx.rotate(axis); ctx.scale(1, c); ctx.rotate(-axis); ctx.translate(-cx, -cy);
+  fn();
+  ctx.restore();
+}
+
 function drawRings(t, cx, cy, R) {
   ctx.save();
   ctx.translate(cx, cy);
   ctx.globalAlpha = 0.6;
-  RINGS.forEach((g, i) => {
+  RINGS.forEach((g, i) => gyro(10 + i, 0, 0, () => {
     const r = R * g.f;
     ctx.strokeStyle = i % 2 ? t.a : t.p;
     ctx.lineWidth = g.w;
     ctx.setLineDash(g.dash(r));
     ctx.lineDashOffset = -phase * g.dir * (1 + level) * r;
     ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.stroke();
-  });
+    ctx.setLineDash([]);
+    ctx.lineDashOffset = 0;
+  }));
   ctx.setLineDash([]);
   ctx.lineDashOffset = 0;
   // tick marks on the outside
+  gyro(14, 0, 0, () => {
   ctx.rotate(-phase * 0.2);
   ctx.strokeStyle = t.p; ctx.globalAlpha = 0.5; ctx.lineWidth = 1;
   ctx.beginPath();
@@ -851,6 +884,7 @@ function drawRings(t, cx, cy, R) {
     ctx.lineTo(c * (r + len), sn * (r + len));
   }
   ctx.stroke();
+  });
   ctx.restore();
   ctx.globalAlpha = 1;
 }
@@ -859,7 +893,8 @@ function drawWave(t, cx, cy, R) {
   const base = R * 0.5, n = 72;
   const amp = R * (0.03 + level * 0.2);
   ctx.globalAlpha = 0.8;
-  [[t.p, 1, 2], [t.a, -1.3, 1.2]].forEach(([col, dir, lw]) => {
+  [[t.p, 1, 2], [t.a, -1.3, 1.2]].forEach(([col, dir, lw], k) => gyro(90 + k, cx, cy, () => {
+    ctx.globalAlpha = 0.8;
     ctx.beginPath();
     for (let i = 0; i <= n; i++) {
       const a = i / n * Math.PI * 2;
@@ -869,7 +904,7 @@ function drawWave(t, cx, cy, R) {
     }
     ctx.strokeStyle = col; ctx.lineWidth = lw;
     ctx.stroke();
-  });
+  }));
   ctx.globalAlpha = 1;
 }
 
@@ -1852,12 +1887,12 @@ function drawTendrils(t, cx, cy, R) {
 
 function drawBeat(t, cx, cy, R) {
   ctx.lineWidth = 2;
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 4; i++) gyro(60 + i, cx, cy, () => {
     const z = (phase * 0.45 + i / 4) % 1;
     ctx.strokeStyle = i % 2 ? t.a : t.p;
     ctx.globalAlpha = (1 - z) * 0.7;
     ctx.beginPath(); ctx.arc(cx, cy, R * 0.3 + z * R * 1.4, 0, Math.PI * 2); ctx.stroke();
-  }
+  });
   ctx.globalAlpha = 1;
 }
 
@@ -1868,7 +1903,7 @@ function drawSpectrum(t, cx, cy, R) {
     specBars[i] += (want - specBars[i]) * 0.3;
   }
   ctx.lineWidth = Math.max(2, base * 2 * Math.PI / n * 0.45);
-  [[0, t.p], [1, t.a]].forEach(([odd, col]) => {
+  [[0, t.p], [1, t.a]].forEach(([odd, col]) => gyro(110 + odd, cx, cy, () => {
     ctx.strokeStyle = col; ctx.globalAlpha = 0.8;
     ctx.beginPath();
     for (let i = odd; i < n; i += 2) {
@@ -1877,7 +1912,7 @@ function drawSpectrum(t, cx, cy, R) {
       ctx.moveTo(cx + c * base, cy + sn * base); ctx.lineTo(cx + c * (base + len), cy + sn * (base + len));
     }
     ctx.stroke();
-  });
+  }));
   ctx.globalAlpha = 1;
 }
 
@@ -2087,7 +2122,7 @@ function drawLightning(t, k) {
 
 function drawMandala(t, cx, cy, R) {
   ctx.lineWidth = 1.3;
-  [[12, 0.95, 1, t.p], [8, 0.65, -1.4, t.a], [16, 1.25, 0.6, t.p]].forEach(([n, f, dir, col]) => {
+  [[12, 0.95, 1, t.p], [8, 0.65, -1.4, t.a], [16, 1.25, 0.6, t.p]].forEach(([n, f, dir, col], k) => gyro(70 + k, cx, cy, () => {
     const r = R * f, rot = phase * 0.3 * dir;
     ctx.strokeStyle = col; ctx.globalAlpha = 0.6;
     ctx.beginPath();
@@ -2099,7 +2134,7 @@ function drawMandala(t, cx, cy, R) {
       ctx.quadraticCurveTo(cx + Math.cos(a + 0.35) * (r + bulge) * 0.7, cy + Math.sin(a + 0.35) * (r + bulge) * 0.7, cx + Math.cos(a) * r * 0.3, cy + Math.sin(a) * r * 0.3);
     }
     ctx.stroke();
-  });
+  }));
   ctx.globalAlpha = 1;
 }
 
@@ -2226,7 +2261,7 @@ function drawFireflies(t, k) {
 }
 
 function drawComets(t, cx, cy, R) {
-  [[1.25, 1, 0], [0.9, -1.4, 2], [1.55, 0.7, 4]].forEach(([f, sp, off], i) => {
+  [[1.25, 1, 0], [0.9, -1.4, 2], [1.55, 0.7, 4]].forEach(([f, sp, off], i) => gyro(80 + i, cx, cy, () => {
     const a = phase * sp + off, r = R * f;
     for (let s = 0; s < 5; s++) {
       ctx.strokeStyle = i % 2 ? t.a : t.p;
@@ -2236,7 +2271,7 @@ function drawComets(t, cx, cy, R) {
     }
     ctx.fillStyle = '#ffffff'; ctx.globalAlpha = 1;
     ctx.beginPath(); ctx.arc(cx + Math.cos(a) * r, cy + Math.sin(a) * r, 3.5, 0, Math.PI * 2); ctx.fill();
-  });
+  }));
   ctx.globalAlpha = 1;
 }
 
@@ -2276,13 +2311,11 @@ function drawDataRing(t, cx, cy, R) {
     dataSprites = { theme: cfg.theme, outer: makeDataSprite(t.p, 228, 72, 15), inner: makeDataSprite(t.a, 170, 48, 13) };
   }
   const size = R * 2.55;
-  [[dataSprites.outer, 0.12], [dataSprites.inner, -0.2]].forEach(([sp, dir]) => {
-    ctx.save();
+  [[dataSprites.outer, 0.12], [dataSprites.inner, -0.2]].forEach(([sp, dir], i) => gyro(30 + i, cx, cy, () => {
     ctx.translate(cx, cy); ctx.rotate(phase * dir * (1 + level * 2));
     ctx.globalAlpha = 0.75;
     ctx.drawImage(sp, -size / 2, -size / 2, size, size);
-    ctx.restore();
-  });
+  }));
   ctx.globalAlpha = 1;
 }
 
@@ -2303,42 +2336,51 @@ function arcRing(cx, cy, r, w, col, alpha, segs, gap, rot) {
 
 function drawHudRings(t, cx, cy, R) {
   ctx.lineCap = 'butt';
-  arcRing(cx, cy, R * 0.42, 7, t.p, 0.85, 3, 0.18, phase * 0.5);
-  arcRing(cx, cy, R * 0.5, 1, t.p, 0.4, 0, 0, 0);
+  const G = (i, fn) => gyro(i, cx, cy, fn);
+  G(20, () => arcRing(cx, cy, R * 0.42, 7, t.p, 0.85, 3, 0.18, phase * 0.5));
+  G(21, () => arcRing(cx, cy, R * 0.5, 1, t.p, 0.4, 0, 0, 0));
   // fine tick ring
-  ctx.strokeStyle = t.p; ctx.globalAlpha = 0.5; ctx.lineWidth = 1;
-  ctx.beginPath();
-  const tr = R * 0.58, rot = -phase * 0.15;
-  for (let i = 0; i < 120; i++) {
-    const a = rot + i / 120 * Math.PI * 2, l = i % 10 === 0 ? 9 : 4;
-    ctx.moveTo(cx + Math.cos(a) * tr, cy + Math.sin(a) * tr);
-    ctx.lineTo(cx + Math.cos(a) * (tr + l), cy + Math.sin(a) * (tr + l));
-  }
-  ctx.stroke();
+  G(22, () => {
+    ctx.strokeStyle = t.p; ctx.globalAlpha = 0.5; ctx.lineWidth = 1;
+    ctx.beginPath();
+    const tr = R * 0.58, rot = -phase * 0.15;
+    for (let i = 0; i < 120; i++) {
+      const a = rot + i / 120 * Math.PI * 2, l = i % 10 === 0 ? 9 : 4;
+      ctx.moveTo(cx + Math.cos(a) * tr, cy + Math.sin(a) * tr);
+      ctx.lineTo(cx + Math.cos(a) * (tr + l), cy + Math.sin(a) * (tr + l));
+    }
+    ctx.stroke();
+  });
   // power gauge (accent color) that rises with activity
   const fill = 0.35 + Math.sin(phase * 0.7) * 0.1 + level * 0.45 + (curState() === 'thinking' ? 0.2 : 0);
-  arcRing(cx, cy, R * 0.68, 9, t.p, 0.12, 0, 0, 0);
-  ctx.strokeStyle = t.a; ctx.globalAlpha = 0.9; ctx.lineWidth = 9;
-  ctx.beginPath(); ctx.arc(cx, cy, R * 0.68, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.min(0.98, fill)); ctx.stroke();
-  arcRing(cx, cy, R * 0.79, 3, t.p, 0.6, 24, 0.35, -phase * 0.3);
+  G(23, () => {
+    arcRing(cx, cy, R * 0.68, 9, t.p, 0.12, 0, 0, 0);
+    ctx.strokeStyle = t.a; ctx.globalAlpha = 0.9; ctx.lineWidth = 9;
+    ctx.beginPath(); ctx.arc(cx, cy, R * 0.68, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.min(0.98, fill)); ctx.stroke();
+  });
+  G(24, () => arcRing(cx, cy, R * 0.79, 3, t.p, 0.6, 24, 0.35, -phase * 0.3));
   // rotating bracket arcs with end markers
-  const br = R * 0.92, brot = phase * 0.22;
-  arcRing(cx, cy, br, 2.5, t.p, 0.8, 4, 0.62, brot);
-  ctx.fillStyle = t.a; ctx.globalAlpha = 0.9;
-  ctx.beginPath();
-  for (let i = 0; i < 4; i++) {
-    const a = brot + i * Math.PI / 2;
-    const x = cx + Math.cos(a) * br, y = cy + Math.sin(a) * br;
-    ctx.moveTo(x + Math.cos(a) * 7, y + Math.sin(a) * 7);
-    ctx.lineTo(x + Math.cos(a + 1.6) * 5, y + Math.sin(a + 1.6) * 5);
-    ctx.lineTo(x + Math.cos(a - 1.6) * 5, y + Math.sin(a - 1.6) * 5);
-  }
-  ctx.fill();
-  arcRing(cx, cy, R * 1.04, 1, t.p, 0.3, 0, 0, 0);
-  // orbiting marker + readouts
-  const ma = phase * 0.6, mr = R * 1.04;
-  ctx.fillStyle = '#ffffff'; ctx.globalAlpha = 1;
-  ctx.beginPath(); ctx.arc(cx + Math.cos(ma) * mr, cy + Math.sin(ma) * mr, 3, 0, Math.PI * 2); ctx.fill();
+  G(25, () => {
+    const br = R * 0.92, brot = phase * 0.22;
+    arcRing(cx, cy, br, 2.5, t.p, 0.8, 4, 0.62, brot);
+    ctx.fillStyle = t.a; ctx.globalAlpha = 0.9;
+    ctx.beginPath();
+    for (let i = 0; i < 4; i++) {
+      const a = brot + i * Math.PI / 2;
+      const x = cx + Math.cos(a) * br, y = cy + Math.sin(a) * br;
+      ctx.moveTo(x + Math.cos(a) * 7, y + Math.sin(a) * 7);
+      ctx.lineTo(x + Math.cos(a + 1.6) * 5, y + Math.sin(a + 1.6) * 5);
+      ctx.lineTo(x + Math.cos(a - 1.6) * 5, y + Math.sin(a - 1.6) * 5);
+    }
+    ctx.fill();
+  });
+  G(26, () => {
+    arcRing(cx, cy, R * 1.04, 1, t.p, 0.3, 0, 0, 0);
+    const ma = phase * 0.6, mr = R * 1.04;
+    ctx.fillStyle = '#ffffff'; ctx.globalAlpha = 1;
+    ctx.beginPath(); ctx.arc(cx + Math.cos(ma) * mr, cy + Math.sin(ma) * mr, 3, 0, Math.PI * 2); ctx.fill();
+  });
+  // readouts stay flat so they're easy to read
   ctx.font = '10px ' + MONO; ctx.fillStyle = t.p; ctx.globalAlpha = 0.85; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   const labels = [String((fill * 100) | 0).padStart(3, '0') + '%', 'SYNC', curState().toUpperCase(), String((phase * 13 | 0) % 1000).padStart(3, '0')];
   labels.forEach((txt, i) => {
@@ -2620,14 +2662,14 @@ function render(dt) {
   if (L.rings) drawRings(t, cx, cy, R);
   if (L.sphere) drawSphere(t, cx, cy, R);
   if (L.orbits) drawOrbits(t, cx, cy, R);
-  if (L.hex) drawHex(t, cx, cy, R);
-  if (L.radar) drawRadar(t, cx, cy, R);
+  if (L.hex) gyro(45, cx, cy, () => drawHex(t, cx, cy, R));
+  if (L.radar) gyro(44, cx, cy, () => drawRadar(t, cx, cy, R));
   if (L.helix) drawHelix(t, cx, cy, R);
   if (L.beat) drawBeat(t, cx, cy, R);
   if (L.tendrils) drawTendrils(t, cx, cy, R);
   if (L.spectrum) drawSpectrum(t, cx, cy, R);
   if (L.mandala) drawMandala(t, cx, cy, R);
-  if (L.spiro) drawSpiro(t, cx, cy, R);
+  if (L.spiro) gyro(43, cx, cy, () => drawSpiro(t, cx, cy, R));
   if (L.planets) drawPlanets(t, cx, cy, R);
   if (L.comets) drawComets(t, cx, cy, R);
   if (L.hologlobe) drawHoloGlobe(t, cx, cy, R);
@@ -2809,6 +2851,7 @@ function updateUI() {
   act('[data-quality]', b => b.dataset.quality === cfg.quality);
   act('[data-snow]', b => +b.dataset.snow === (cfg.snow || 0));
   act('[data-camera]', b => b.dataset.camera === (cfg.camera || 'drift'));
+  act('[data-gyro]', b => b.dataset.gyro === (cfg.gyro || 'full'));
   act('[data-touch]', b => b.dataset.touch === (cfg.touch || 'random'));
   act('[data-persona]', b => b.dataset.persona === (cfg.persona || 'quirky'));
   act('[data-face]', b => (b.dataset.face === '1') === (cfg.face !== false));
@@ -2878,6 +2921,7 @@ function buildUI() {
   document.querySelectorAll('[data-quality]').forEach(b => b.onclick = () => set('quality', b.dataset.quality));
   document.querySelectorAll('[data-snow]').forEach(b => b.onclick = () => set('snow', +b.dataset.snow));
   document.querySelectorAll('[data-camera]').forEach(b => b.onclick = () => set('camera', b.dataset.camera));
+  document.querySelectorAll('[data-gyro]').forEach(b => b.onclick = () => set('gyro', b.dataset.gyro));
   document.querySelectorAll('[data-touch]').forEach(b => b.onclick = () => set('touch', b.dataset.touch));
   document.querySelectorAll('[data-persona]').forEach(b => b.onclick = () => set('persona', b.dataset.persona));
   document.querySelectorAll('[data-face]').forEach(b => b.onclick = () => set('face', b.dataset.face === '1'));
